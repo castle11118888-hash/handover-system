@@ -6,7 +6,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>交接管理系統｜版本B.2.9</title>
+  <title>交接管理系統｜版本B.3.1</title>
   <style>
     :root{
       --bg:#f4f6fb; --card:#fff; --text:#111827; --muted:#6b7280; --border:#e5e7eb;
@@ -418,14 +418,27 @@ function renderDashboard(){
   const t = totals(), rows = dashboardRows(), results = globalResults();
   if(!state.searchText.trim()){
     return `
+    <div class="card section">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div>
+          <h2 style="margin:0">總覽統計</h2>
+          <div class="small muted" style="margin-top:6px">依所選日期與班別統計：${escapeHtml(state.selectedDate)}｜${escapeHtml(state.selectedShift)}</div>
+        </div>
+        <div class="toolbar">
+          <input class="w180" type="date" id="dateInput" value="${escapeHtml(state.selectedDate)}">
+          <select class="w140" id="shiftInput">${optionHtml(shifts,state.selectedShift)}</select>
+        </div>
+      </div>
+    </div>
     <div class="grid4">
-      <div class="card stat"><div class="sub">交接總數</div><div class="num">${t.totalItems}</div><div class="sub">目前合計</div></div>
-      <div class="card stat"><div class="sub">已完成</div><div class="num">${t.totalDone}</div><div class="sub">完成數</div></div>
-      <div class="card stat"><div class="sub">待處理</div><div class="num">${t.totalAbnormal}</div><div class="sub">需追蹤</div></div>
-      <div class="card stat"><div class="sub">平均進度</div><div class="num">${t.avgProgress}%</div><div class="sub">全店平均</div></div>
+      <div class="card stat"><div class="sub">交接總數</div><div class="num">${t.totalItems}</div><div class="sub">本班別合計</div></div>
+      <div class="card stat"><div class="sub">已完成</div><div class="num">${t.totalDone}</div><div class="sub">本班別完成數</div></div>
+      <div class="card stat"><div class="sub">待處理</div><div class="num">${t.totalAbnormal}</div><div class="sub">本班別需追蹤</div></div>
+      <div class="card stat"><div class="sub">平均進度</div><div class="num">${t.avgProgress}%</div><div class="sub">本班別平均</div></div>
     </div>
     <div class="card section">
       <h2>各店進度</h2>
+      <div class="small muted" style="margin:-4px 0 14px">以下數字只計算目前選擇的班別，不合併早班 / 中班 / 晚班。</div>
       <div class="grid4">
         ${rows.map(row => `
           <div class="card storecard" onclick="openStoreFromUI('${row.id}')">
