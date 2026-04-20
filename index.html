@@ -6,7 +6,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>交接管理系統｜版本B.3.5.1</title>
+  <title>交接管理系統｜版本B.3.5.3</title>
   <style>
     :root{
       --bg:#f4f6fb; --card:#fff; --text:#111827; --muted:#6b7280; --border:#e5e7eb;
@@ -91,7 +91,8 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-const shifts = ["早班","中班","晚班"];
+const shifts = ["早班","中班","晚班"]
+const shiftLabel = v => v ? v : "全部班別";
 const categories = ["人員","事情","宣導","保全","廚房","其他"];
 const statuses = {
   pending: { label:"待處理", cls:"neutral" },
@@ -111,7 +112,7 @@ let state = {
   authReady:false,currentUser:null,profile:null,
   users:[],handovers:[],announcements:[],stores:storesSeed,
   tab:"dashboard",searchText:"",formsStatusFilter:"",
-  selectedDate:today(),selectedShift:"晚班",selectedStore:"A",
+  selectedDate:today(),selectedShift:"",selectedStore:"A",
   historyDate:"",historyStore:"A",historyShift:"",historyStatusFilter:"",
   loginEmail:"",loginPassword:"",
   registerName:"",registerEmail:"",registerPassword:"",
@@ -168,7 +169,7 @@ function totals(){
     avgProgress: rows.length ? Math.round(rows.reduce((a,b)=>a+b.progress,0)/rows.length) : 0
   };
 }
-const currentItems = () => state.handovers.filter(h => h.date===state.selectedDate && h.shift===state.selectedShift && h.storeId===effectiveStore());
+const currentItems = () => state.handovers.filter(h => h.date===state.selectedDate && (!state.selectedShift || h.shift===state.selectedShift) && h.storeId===effectiveStore());
 const filteredItems = () => {
   const q = state.searchText.trim().toLowerCase();
   return currentItems().filter(i => {
@@ -300,6 +301,7 @@ async function logout(){
 async function addItem(){
   const content = state.newItemContent.trim();
   if(!content) return;
+  if(!state.selectedShift) return alert("新增交接時請先選擇班別");
   await addDoc(collection(db,"handovers"),{
     date:state.selectedDate,shift:state.selectedShift,storeId:effectiveStore(),category:state.newItemCategory,
     content,status:state.newItemStatus,carried:false,createdByUid:state.currentUser.uid,createdByName:currentUserName(),
@@ -397,9 +399,9 @@ function renderLogin(root){
   root.innerHTML = `
   <div class="login-wrap">
     <div class="card hero">
-      <div class="badge">版本 B.3.5.1</div>
+      <div class="badge">版本 B.3.5.3</div>
       <div class="title" style="margin-top:12px">交接管理系統</div>
-      <p class="muted" style="font-size:18px;line-height:1.8">版本 B.3.5.1 已加入：角色中文化、角色儲存修正、帳號管理優化、歷史查詢、密碼重設、手機版優化。</p>
+      <p class="muted" style="font-size:18px;line-height:1.8">版本 B.3.5.3 已加入：角色中文化、角色儲存修正、帳號管理優化、歷史查詢、密碼重設、手機版優化。</p>
       <div class="grid4" style="margin-top:18px">
         <div class="card stat"><div class="sub">角色權限</div><div class="num">完整</div><div class="sub">顯示修正完成</div></div>
         <div class="card stat"><div class="sub">公告</div><div class="num">可刪</div><div class="sub">管理員 / 店長</div></div>
@@ -457,7 +459,7 @@ function renderDashboard(){
         </div>
         <div class="toolbar">
           <input class="w180" type="date" id="dateInput" value="${escapeHtml(state.selectedDate)}">
-          <select class="w140" id="shiftInput">${optionHtml(shifts,state.selectedShift)}</select>
+          <select class="w140" id="shiftInput"><option value="" ${!state.selectedShift?"selected":""}>全部班別</option>${optionHtml(shifts,state.selectedShift)}</select>
         </div>
       </div>
     </div>
@@ -535,7 +537,7 @@ function renderForms(){
       <h2 style="margin:0">交接事項</h2>
       <div class="toolbar">
         <input class="w180" type="date" id="dateInput" value="${escapeHtml(state.selectedDate)}">
-        <select class="w140" id="shiftInput">${optionHtml(shifts,state.selectedShift)}</select>
+        <select class="w140" id="shiftInput"><option value="" ${!state.selectedShift?"selected":""}>全部班別</option>${optionHtml(shifts,state.selectedShift)}</select>
         <select class="w180" id="storeInput" ${canViewAllStores()?"":"disabled"}>${storeOptionsHtml(effectiveStore())}</select>
       </div>
     </div>
@@ -729,7 +731,7 @@ function renderApp(root){
     <div class="card topbar">
       <div>
         <div class="title">交接管理後台</div>
-        <div class="sub">${escapeHtml(currentUserName())}｜${roleLabel(state.profile?.role)}｜${canViewAllStores()?"全店":escapeHtml(effectiveStore()+"店")}｜${escapeHtml(state.selectedDate)}｜${escapeHtml(state.selectedShift)}</div>
+        <div class="sub">${escapeHtml(currentUserName())}｜${roleLabel(state.profile?.role)}｜${canViewAllStores()?"全店":escapeHtml(effectiveStore()+"店")}｜${escapeHtml(state.selectedDate)}｜${escapeHtml(shiftLabel(state.selectedShift))}</div>
       </div>
       <div class="top-actions">
         <input class="w240" id="searchInput" placeholder="全站搜尋" value="${escapeHtml(state.searchText)}">
@@ -746,7 +748,7 @@ function renderApp(root){
         ${canManageUsers() ? `<button class="navbtn ${state.tab==="users"?"active":""}" onclick="switchTab('users')">帳號</button>` : ""}
         <div style="height:14px"></div>
         <div class="okbox small">
-          版本 B.3.5.1.1 已啟用：<br>
+          版本 B.3.5.3.1 已啟用：<br>
           ・角色中文顯示<br>
           ・角色儲存修正<br>
           ・帳號頁操作優化<br>
@@ -851,7 +853,7 @@ window.deleteItemFromUI = deleteItem;
 window.addAnnouncementFromUI = addAnnouncement;
 window.deleteAnnouncementFromUI = deleteAnnouncement;
 window.switchTab = tab => setState({tab});
-window.resetFiltersFromUI = () => setState({searchText:"",formsStatusFilter:"",historyStatusFilter:"",selectedDate:today(),selectedShift:"晚班",selectedStore:canViewAllStores()?"A":(profileStoreId(state.profile)||"A")});
+window.resetFiltersFromUI = () => setState({searchText:"",formsStatusFilter:"",historyStatusFilter:"",selectedDate:today(),selectedShift:"",selectedStore:canViewAllStores()?"A":(profileStoreId(state.profile)||"A")});
 window.setFormsStatusFilterFromUI = status => setState({formsStatusFilter:status,tab:"forms"});
 window.clearFormsStatusFilterFromUI = () => setState({formsStatusFilter:""});
 window.setHistoryStatusFilterFromUI = status => setState({historyStatusFilter:status,tab:"history"});
