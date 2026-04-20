@@ -5,8 +5,9 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
+  <meta http-equiv="Clear-Site-Data" content="\"cache\", \"storage\"" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>交接管理系統｜版本B.4.15</title>
+  <title>交接管理系統｜版本B.4.16</title>
   <style>
     :root{
       --bg:#f4f6fb; --card:#fff; --text:#111827; --muted:#6b7280; --border:#e5e7eb;
@@ -93,6 +94,27 @@
       .app{padding:12px}.title{font-size:22px}
     }
   </style>
+
+<script>
+(function() {
+  const APP_VERSION = "B.4.16";
+  const KEY = "handover_app_version";
+  const last = localStorage.getItem(KEY);
+  if (last !== APP_VERSION) {
+    try {
+      localStorage.setItem(KEY, APP_VERSION);
+      if ("caches" in window) {
+        caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).catch(() => {});
+      }
+      if (window.sessionStorage.getItem("handover_force_reload_done") !== APP_VERSION) {
+        window.sessionStorage.setItem("handover_force_reload_done", APP_VERSION);
+        window.location.replace(window.location.pathname + "?v=" + encodeURIComponent(APP_VERSION) + "&t=" + Date.now());
+      }
+    } catch (e) {}
+  }
+})();
+</script>
+
 </head>
 <body>
 <div id="root"></div>
@@ -460,7 +482,7 @@ function renderLogin(root){
       <div class="card weather-hero">
         <div class="weather-row">
           <div>
-            <div class="badge" style="background:rgba(255,255,255,.16);color:#fff">B.4.15 首頁門面版</div>
+            <div class="badge" style="background:rgba(255,255,255,.16);color:#fff">B.4.16 首頁門面版</div>
             <div style="height:14px"></div>
             <div class="weather-city">今日天氣資訊</div>
             <div class="weather-desc">${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,"0")}/${String(now.getDate()).padStart(2,"0")}（週${weekdays[now.getDay()]}）　${hh}:${mm}</div>
@@ -868,7 +890,7 @@ function renderApp(root){
         ${canManageUsers() ? `<button class="navbtn ${state.tab==="users"?"active":""}" onclick="switchTab('users')">帳號</button>` : ""}
         <div style="height:14px"></div>
         <div class="okbox small">
-          版本 B.4.15 已啟用：<br>
+          版本 B.4.16 已啟用：<br>
           ・角色中文顯示<br>
           ・角色儲存修正<br>
           ・帳號頁操作優化<br>
@@ -1009,6 +1031,9 @@ if ("serviceWorker" in navigator) {
         const keys = await caches.keys();
         await Promise.all(keys.map(k => caches.delete(k)));
       }
+      try {
+        localStorage.setItem("handover_app_version","B.4.16");
+      } catch(err) {}
       console.log("舊快取已清除");
     } catch (e) {
       console.log("清除快取失敗", e);
