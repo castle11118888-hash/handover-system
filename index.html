@@ -6,7 +6,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>交接管理系統｜版本B.3.2</title>
+  <title>交接管理系統｜版本B.3.3</title>
   <style>
     :root{
       --bg:#f4f6fb; --card:#fff; --text:#111827; --muted:#6b7280; --border:#e5e7eb;
@@ -110,7 +110,7 @@ let state = {
   users:[],handovers:[],announcements:[],stores:storesSeed,
   tab:"dashboard",searchText:"",formsStatusFilter:"",
   selectedDate:today(),selectedShift:"晚班",selectedStore:"A",
-  historyDate:"",historyStore:"A",historyShift:"",
+  historyDate:"",historyStore:"A",historyShift:"",historyStatusFilter:"",
   loginEmail:"",loginPassword:"",
   registerName:"",registerEmail:"",registerPassword:"",
   loginError:"",registerError:"",infoMessage:"",
@@ -182,7 +182,7 @@ const statusQuickLinks = [
   { key:"pending_followup", label:"待追蹤", cls:"warn" }
 ];
 const historyItems = () => state.handovers
-  .filter(h => (!state.historyDate || h.date===state.historyDate) && (!state.historyShift || h.shift===state.historyShift) && h.storeId===state.historyStore)
+  .filter(h => (!state.historyDate || h.date===state.historyDate) && (!state.historyShift || h.shift===state.historyShift) && (!state.historyStatusFilter || h.status===state.historyStatusFilter) && h.storeId===state.historyStore)
   .sort((a,b) => `${b.date}${b.shift}`.localeCompare(`${a.date}${a.shift}`));
 
 function globalResults(){
@@ -361,14 +361,15 @@ async function saveStoreName(id){
 }
 const openStore = id => setState({selectedStore:id,tab:"forms",formsStatusFilter:""});
 const openStoreStatus = (id,status) => setState({selectedStore:id,tab:"forms",formsStatusFilter:status});
+const openHistoryStatus = (id,status) => setState({tab:"history",historyDate:state.selectedDate,historyStore:id,historyShift:"",historyStatusFilter:status});
 
 function renderLogin(root){
   root.innerHTML = `
   <div class="login-wrap">
     <div class="card hero">
-      <div class="badge">版本 B.3.2</div>
+      <div class="badge">版本 B.3.3</div>
       <div class="title" style="margin-top:12px">交接管理系統</div>
-      <p class="muted" style="font-size:18px;line-height:1.8">版本 B.3.2 已加入：角色中文化、角色儲存修正、帳號管理優化、歷史查詢、密碼重設、手機版優化。</p>
+      <p class="muted" style="font-size:18px;line-height:1.8">版本 B.3.3 已加入：角色中文化、角色儲存修正、帳號管理優化、歷史查詢、密碼重設、手機版優化。</p>
       <div class="grid4" style="margin-top:18px">
         <div class="card stat"><div class="sub">角色權限</div><div class="num">完整</div><div class="sub">顯示修正完成</div></div>
         <div class="card stat"><div class="sub">公告</div><div class="num">可刪</div><div class="sub">管理員 / 店長</div></div>
@@ -431,14 +432,14 @@ function renderDashboard(){
       </div>
     </div>
     <div class="grid4">
-      <div class="card stat"><div class="sub">交接總數</div><div class="num">${t.totalItems}</div><div class="sub">本班別合計</div></div>
-      <div class="card stat"><div class="sub">已完成</div><div class="num">${t.totalDone}</div><div class="sub">本班別完成數</div></div>
-      <div class="card stat"><div class="sub">待處理</div><div class="num">${t.totalAbnormal}</div><div class="sub">本班別需追蹤</div></div>
-      <div class="card stat"><div class="sub">平均進度</div><div class="num">${t.avgProgress}%</div><div class="sub">本班別平均</div></div>
+      <div class="card stat"><div class="sub">交接總數</div><div class="num">${t.totalItems}</div><div class="sub">當日三班合計</div></div>
+      <div class="card stat"><div class="sub">已完成</div><div class="num">${t.totalDone}</div><div class="sub">當日三班完成數</div></div>
+      <div class="card stat"><div class="sub">待處理</div><div class="num">${t.totalAbnormal}</div><div class="sub">當日待處理 / 待追蹤</div></div>
+      <div class="card stat"><div class="sub">平均進度</div><div class="num">${t.avgProgress}%</div><div class="sub">當日全店平均</div></div>
     </div>
     <div class="card section">
       <h2>各店進度</h2>
-      <div class="small muted" style="margin:-4px 0 14px">以下數字只計算目前選擇的班別，不合併早班 / 中班 / 晚班。</div>
+      <div class="small muted" style="margin:-4px 0 14px">以下數字為目前所選日期的每日三班合計；點各狀態可直接開啟該店歷史記錄。</div>
       <div class="grid4">
         ${rows.map(row => `
           <div class="card storecard" onclick="openStoreFromUI('${row.id}')">
@@ -449,10 +450,10 @@ function renderDashboard(){
             <div class="progress"><div class="bar" style="width:${row.progress}%"></div></div>
             <div class="small muted" style="margin-top:8px">完成 ${row.progress}%</div>
             <div class="grid2" style="margin-top:12px">
-              <button class="card stat" style="padding:12px;text-align:left;cursor:pointer" onclick="event.stopPropagation();openStoreStatusFromUI('${row.id}','done')"><div class="sub">已處理</div><div class="num" style="font-size:22px">${row.done}</div></button>
-              <button class="card stat" style="padding:12px;text-align:left;cursor:pointer" onclick="event.stopPropagation();openStoreStatusFromUI('${row.id}','in_progress')"><div class="sub">處理中</div><div class="num" style="font-size:22px">${row.inProgress}</div></button>
-              <button class="card stat" style="padding:12px;text-align:left;cursor:pointer" onclick="event.stopPropagation();openStoreStatusFromUI('${row.id}','pending')"><div class="sub">待處理</div><div class="num" style="font-size:22px">${row.pending}</div></button>
-              <button class="card stat" style="padding:12px;text-align:left;cursor:pointer" onclick="event.stopPropagation();openStoreStatusFromUI('${row.id}','pending_followup')"><div class="sub">待追蹤</div><div class="num" style="font-size:22px">${row.followup}</div></button>
+              <button class="card stat" style="padding:12px;text-align:left;cursor:pointer" onclick="event.stopPropagation();openHistoryStatusFromUI('${row.id}','done')"><div class="sub">已處理</div><div class="num" style="font-size:22px">${row.done}</div></button>
+              <button class="card stat" style="padding:12px;text-align:left;cursor:pointer" onclick="event.stopPropagation();openHistoryStatusFromUI('${row.id}','in_progress')"><div class="sub">處理中</div><div class="num" style="font-size:22px">${row.inProgress}</div></button>
+              <button class="card stat" style="padding:12px;text-align:left;cursor:pointer" onclick="event.stopPropagation();openHistoryStatusFromUI('${row.id}','pending')"><div class="sub">待處理</div><div class="num" style="font-size:22px">${row.pending}</div></button>
+              <button class="card stat" style="padding:12px;text-align:left;cursor:pointer" onclick="event.stopPropagation();openHistoryStatusFromUI('${row.id}','pending_followup')"><div class="sub">待追蹤</div><div class="num" style="font-size:22px">${row.followup}</div></button>
             </div>
           </div>`).join("")}
       </div>
@@ -628,12 +629,18 @@ function renderHistory(){
       <select id="historyShift"><option value="">全部班別</option>${optionHtml(shifts,state.historyShift)}</select>
     </div>
     <div style="height:12px"></div>
+    <div class="row" style="gap:10px;flex-wrap:wrap">
+      <span class="small muted">狀態篩選：</span>
+      ${statusQuickLinks.map(s => `<button class="btn ${state.historyStatusFilter===s.key?"primary":"secondary"}" onclick="setHistoryStatusFilterFromUI('${s.key}')">${s.label}</button>`).join("")}
+      <button class="btn secondary" onclick="clearHistoryStatusFilterFromUI()">清除篩選</button>
+    </div>
+    <div style="height:12px"></div>
     ${items.length ? `<div class="list">${items.map(i=>`
       <div class="item">
         <div class="chips">
           <span class="chip">${escapeHtml(i.date)}</span>
           <span class="chip">${escapeHtml(i.shift)}</span>
-          <span class="chip">${escapeHtml(i.storeId)}店</span>
+          <span class="chip">${escapeHtml(storeNameById(i.storeId))}</span>
           <span class="chip ${statuses[i.status]?.cls||"neutral"}">${escapeHtml(statuses[i.status]?.label||i.status)}</span>
         </div>
         <div style="margin-top:10px">${escapeHtml(i.content)}</div>
@@ -701,7 +708,7 @@ function renderApp(root){
         ${canManageUsers() ? `<button class="navbtn ${state.tab==="users"?"active":""}" onclick="switchTab('users')">帳號</button>` : ""}
         <div style="height:14px"></div>
         <div class="okbox small">
-          版本 B.3.2 已啟用：<br>
+          版本 B.3.3 已啟用：<br>
           ・角色中文顯示<br>
           ・角色儲存修正<br>
           ・帳號頁操作優化<br>
@@ -774,15 +781,18 @@ window.resetPasswordFromUI = resetPassword;
 window.logoutFromUI = logout;
 window.openStoreFromUI = openStore;
 window.openStoreStatusFromUI = openStoreStatus;
+window.openHistoryStatusFromUI = openHistoryStatus;
 window.addItemFromUI = addItem;
 window.updateStatusFromUI = updateStatus;
 window.deleteItemFromUI = deleteItem;
 window.addAnnouncementFromUI = addAnnouncement;
 window.deleteAnnouncementFromUI = deleteAnnouncement;
 window.switchTab = tab => setState({tab});
-window.resetFiltersFromUI = () => setState({searchText:"",formsStatusFilter:"",selectedDate:today(),selectedShift:"晚班",selectedStore:canViewAllStores()?"A":(profileStoreId(state.profile)||"A")});
+window.resetFiltersFromUI = () => setState({searchText:"",formsStatusFilter:"",historyStatusFilter:"",selectedDate:today(),selectedShift:"晚班",selectedStore:canViewAllStores()?"A":(profileStoreId(state.profile)||"A")});
 window.setFormsStatusFilterFromUI = status => setState({formsStatusFilter:status,tab:"forms"});
 window.clearFormsStatusFilterFromUI = () => setState({formsStatusFilter:""});
+window.setHistoryStatusFilterFromUI = status => setState({historyStatusFilter:status,tab:"history"});
+window.clearHistoryStatusFilterFromUI = () => setState({historyStatusFilter:"",tab:"history"});
 window.saveUserRoleFromUI = async uid => {
   const role = document.getElementById(`role_${uid}`).value;
   const storeId = document.getElementById(`store_${uid}`).value || null;
