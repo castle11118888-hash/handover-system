@@ -143,7 +143,7 @@ let state = {
   loginEmail:"",loginPassword:"",
   registerName:"",registerEmail:"",registerPassword:"",
   loginError:"",registerError:"",infoMessage:"",
-  newItemCategory:"人員",newItemContent:"",newItemStatus:"pending",newItemPhotoPreview:"",newItemPhotoName:"",
+  newItemShift:"早班",newItemCategory:"人員",newItemContent:"",newItemStatus:"pending",newItemPhotoPreview:"",newItemPhotoName:"",
   newAnnouncementTitle:"",newAnnouncementContent:"",newAnnouncementStore:"all",
   editingItemId:null,editingItemContent:"",
   formsReadFilter:"all",
@@ -371,7 +371,8 @@ async function logout(){
 async function addItem(){
   const content = state.newItemContent.trim();
   if(!content) return;
-  if(!state.selectedShift) return alert("新增交接時請先選擇班別");
+  const itemShift = state.newItemShift || state.selectedShift || "";
+  if(!itemShift) return alert("新增交接時請先選擇班別");
   try{
     let photoUrl = "", photoName = "";
     if(pendingPhotoFile){
@@ -379,13 +380,13 @@ async function addItem(){
       photoName = pendingPhotoFile.name || "照片";
     }
     await addDoc(collection(db,"handovers"),{
-      date:state.selectedDate,shift:state.selectedShift,storeId:effectiveStore(),category:state.newItemCategory,
+      date:state.selectedDate,shift:itemShift,storeId:effectiveStore(),category:state.newItemCategory,
       content,status:state.newItemStatus,carried:false,createdByUid:state.currentUser.uid,createdByName:currentUserName(),
       readBy:[],photoUrl,photoName,
       createdAt:serverTimestamp(),updatedAt:serverTimestamp()
     });
     resetPendingPhoto();
-    setState({newItemContent:"",newItemCategory:"人員",newItemStatus:"pending",newItemPhotoPreview:"",newItemPhotoName:""});
+    setState({newItemShift:itemShift,newItemContent:"",newItemCategory:"人員",newItemStatus:"pending",newItemPhotoPreview:"",newItemPhotoName:""});
   }catch(e){
     console.error(e);
     alert("照片上傳失敗，請確認 Firebase Storage 已啟用且權限已開放。沒有照片也可先新增文字交接。");
@@ -496,7 +497,7 @@ function renderLogin(root){
       <div class="card weather-hero">
         <div class="weather-row">
           <div>
-            <div class="badge" style="background:rgba(255,255,255,.16);color:#fff">B.4.4.1 首頁門面版</div>
+            <div class="badge" style="background:rgba(255,255,255,.16);color:#fff">B.4.4.2 首頁門面版</div>
             <div style="height:14px"></div>
             <div class="weather-city">今日天氣資訊</div>
             <div class="weather-desc">${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,"0")}/${String(now.getDate()).padStart(2,"0")}（週${weekdays[now.getDay()]}）　${hh}:${mm}</div>
@@ -650,7 +651,8 @@ function renderForms(){
   return `
   <div class="card section">
     <h2>新增交接</h2>
-    <div class="form-grid">
+    <div class="form-grid" style="grid-template-columns:140px 1fr 1fr 1fr 140px">
+      <select id="newShift">${optionHtml(shifts,state.newItemShift)}</select>
       <select id="newCategory">${optionHtml(categories,state.newItemCategory)}</select>
       <input id="newContent" placeholder="輸入交接內容" value="${escapeHtml(state.newItemContent)}">
       <select id="newStatus">${Object.keys(statuses).map(k=>`<option value="${k}" ${state.newItemStatus===k?"selected":""}>${statuses[k].label}</option>`).join("")}</select>
@@ -892,7 +894,7 @@ function renderApp(root){
         ${canManageUsers() ? `<button class="navbtn ${state.tab==="users"?"active":""}" onclick="switchTab('users')">帳號</button>` : ""}
         <div style="height:14px"></div>
         <div class="okbox small">
-          版本 B.4.4.1 已啟用：<br>
+          版本 B.4.4.2 已啟用：<br>
           ・角色中文顯示<br>
           ・角色儲存修正<br>
           ・帳號頁操作優化<br>
@@ -934,6 +936,7 @@ function renderApp(root){
   const hdate = document.getElementById("historyDate"); if(hdate) hdate.onchange = e => setState({historyDate:e.target.value});
   const hstore = document.getElementById("historyStore"); if(hstore) hstore.onchange = e => setState({historyStore:e.target.value});
   const hshift = document.getElementById("historyShift"); if(hshift) hshift.onchange = e => setState({historyShift:e.target.value});
+  const nsh = document.getElementById("newShift"); if(nsh) nsh.onchange = e => state.newItemShift = e.target.value;
   const nc = document.getElementById("newCategory"); if(nc) nc.onchange = e => state.newItemCategory = e.target.value;
   const nct = document.getElementById("newContent"); if(nct) nct.oninput = e => state.newItemContent = e.target.value;
   const ns = document.getElementById("newStatus"); if(ns) ns.onchange = e => state.newItemStatus = e.target.value;
