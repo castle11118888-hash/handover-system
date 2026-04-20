@@ -6,7 +6,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>交接管理系統｜版本B.4.6</title>
+  <title>交接管理系統｜版本B.4.7</title>
   <style>
     :root{
       --bg:#f4f6fb; --card:#fff; --text:#111827; --muted:#6b7280; --border:#e5e7eb;
@@ -452,7 +452,7 @@ function renderLogin(root){
       <div class="card weather-hero">
         <div class="weather-row">
           <div>
-            <div class="badge" style="background:rgba(255,255,255,.16);color:#fff">B.4.6 首頁門面版</div>
+            <div class="badge" style="background:rgba(255,255,255,.16);color:#fff">B.4.7 首頁門面版</div>
             <div style="height:14px"></div>
             <div class="weather-city">今日天氣資訊</div>
             <div class="weather-desc">${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,"0")}/${String(now.getDate()).padStart(2,"0")}（週${weekdays[now.getDay()]}）　${hh}:${mm}</div>
@@ -687,6 +687,17 @@ function renderAnnouncements(){
 
 function renderUsers(){
   return `
+  
+  <div class="card section">
+    <h2>新增帳號（管理員）</h2>
+    <div class="form-grid">
+      <input id="regName" placeholder="姓名">
+      <input id="regEmail" placeholder="Email">
+      <input id="regPassword" placeholder="密碼（至少6碼）" type="password">
+      <button class="btn primary" onclick="registerFromUI()">建立帳號</button>
+    </div>
+  </div>
+
   <div class="card section">
     <h2>帳號管理</h2>
     <div class="okbox">管理員可調整姓名、角色與店別，也可新增店家與修改店別名稱；密碼因 Firebase 安全限制無法直接看見或直接改寫，但可由管理員代寄重設密碼信。管理員 / 店長不綁店別，店主管 / 員工需指定店別。</div>
@@ -840,7 +851,7 @@ function renderApp(root){
         ${canManageUsers() ? `<button class="navbtn ${state.tab==="users"?"active":""}" onclick="switchTab('users')">帳號</button>` : ""}
         <div style="height:14px"></div>
         <div class="okbox small">
-          版本 B.4.6 已啟用：<br>
+          版本 B.4.7 已啟用：<br>
           ・角色中文顯示<br>
           ・角色儲存修正<br>
           ・帳號頁操作優化<br>
@@ -886,7 +897,10 @@ function renderApp(root){
   const nc = document.getElementById("newCategory"); if(nc) nc.onchange = e => state.newItemCategory = e.target.value;
   const nct = document.getElementById("newContent"); if(nct) nct.oninput = e => state.newItemContent = e.target.value;
   const ns = document.getElementById("newStatus"); if(ns) ns.onchange = e => state.newItemStatus = e.target.value;
-  const at = document.getElementById("annTitle"); if(at) at.oninput = e => state.newAnnouncementTitle = e.target.value;
+  const rn = document.getElementById("regName"); if(rn) rn.oninput = e => state.registerName = e.target.value;
+  const re = document.getElementById("regEmail"); if(re) re.oninput = e => state.registerEmail = e.target.value;
+  const rp = document.getElementById("regPassword"); if(rp) rp.oninput = e => state.registerPassword = e.target.value;
+    const at = document.getElementById("annTitle"); if(at) at.oninput = e => state.newAnnouncementTitle = e.target.value;
   const ac = document.getElementById("annContent"); if(ac) ac.oninput = e => state.newAnnouncementContent = e.target.value;
   const ast = document.getElementById("annStore"); if(ast) ast.onchange = e => state.newAnnouncementStore = e.target.value;
   state.users.forEach(u => {
