@@ -3,6 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="交接系統" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/icon-192.svg" />
   <title>交接管理系統｜版本B</title>
   <style>
     :root{
@@ -194,6 +201,11 @@ async function ensureProfile(user, nameFromRegister=""){
   const snap = await getDoc(ref);
   if(snap.exists()){
     const data = snap.data();
+    if(data.active===false){
+      await signOut(auth);
+      setState({loginError:"此帳號已被停用，請聯絡管理員。", profile:null, currentUser:null});
+      return;
+    }
     setState({ profile:{id:user.uid,...data,role:normalizeRole(data.role)} });
     subscribeData();
     return;
@@ -290,6 +302,12 @@ async function saveUserRole(uid,role,storeId){
   if(!canManageUsers()) return alert("只有管理員可調整帳號");
   const r = normalizeRole(role);
   await updateDoc(doc(db,"users",uid),{role:r,storeId:["store_supervisor","staff"].includes(r)?storeId:null});
+}
+async function disableUser(uid){
+  if(!canManageUsers()) return alert("只有管理員可刪除帳號");
+  if(state.currentUser && uid===state.currentUser.uid) return alert("不能刪除目前登入的管理員本人");
+  if(!confirm("確定要刪除這個帳號嗎？刪除後此帳號將無法登入。")) return;
+  await updateDoc(doc(db,"users",uid),{active:false,deletedAt:serverTimestamp()});
 }
 const openStore = id => setState({selectedStore:id,tab:"forms"});
 
@@ -478,22 +496,23 @@ function renderUsers(){
   </div>
   <div class="card section">
     <table class="table">
-      <thead><tr><th>帳號</th><th>姓名 / Email</th><th>角色</th><th>店別</th><th>動作</th></tr></thead>
+      <thead><tr><th>帳號</th><th>姓名 / Email</th><th>狀態</th><th>角色</th><th>店別</th><th>動作</th></tr></thead>
       <tbody>
         ${state.users.map(u => `
           <tr>
             <td>${escapeHtml(u.username||"-")}</td>
             <td>${escapeHtml(u.name||u.email||"-")}</td>
+            <td>${u.active===false?'<span class="chip warn">已停用</span>':'<span class="chip ok">正常</span>'}</td>
             <td>
-              <select id="role_${u.id}">
+              <select id="role_${u.id}" ${u.active===false?'disabled':''}>
                 <option value="admin" ${normalizeRole(u.role)==="admin"?"selected":""}>admin</option>
                 <option value="general_manager" ${normalizeRole(u.role)==="general_manager"?"selected":""}>general_manager</option>
                 <option value="store_supervisor" ${normalizeRole(u.role)==="store_supervisor"?"selected":""}>store_supervisor</option>
                 <option value="staff" ${normalizeRole(u.role)==="staff"?"selected":""}>staff</option>
               </select>
             </td>
-            <td><select id="store_${u.id}"><option value="">-</option>${storeOptionsHtml(u.storeId||"")}</select></td>
-            <td><button class="btn secondary" onclick="saveUserRoleFromUI('${u.id}')">儲存</button></td>
+            <td><select id="store_${u.id}" ${u.active===false?'disabled':''}><option value="">-</option>${storeOptionsHtml(u.storeId||"")}</select></td>
+            <td><div class="row"><button class="btn secondary" onclick="saveUserRoleFromUI('${u.id}')" ${'${u.active===false?"disabled":""}'}>儲存</button><button class="btn danger" onclick="disableUserFromUI('${u.id}')" ${'${state.currentUser && u.id===state.currentUser.uid?"disabled":""}'}>刪除</button></div></td>
           </tr>`).join("")}
       </tbody>
     </table>
@@ -598,7 +617,14 @@ function renderApp(root){
     ${renderEditModal()}
   </div>`;
 
-  const search = document.getElementById("searchInput"); if(search) search.oninput = e => setState({searchText:e.target.value});
+  const search = document.getElementById("searchInput");
+  if(search){
+    search.oninput = e => {
+      const val=e.target.value; const pos=e.target.selectionStart;
+      setState({searchText:val});
+      requestAnimationFrame(()=>{ const s=document.getElementById("searchInput"); if(s){ s.focus(); try{s.setSelectionRange(pos,pos)}catch(err){} } });
+    };
+  }
   const date = document.getElementById("dateInput"); if(date) date.onchange = e => setState({selectedDate:e.target.value});
   const shift = document.getElementById("shiftInput"); if(shift) shift.onchange = e => setState({selectedShift:e.target.value});
   const store = document.getElementById("storeInput"); if(store) store.onchange = e => setState({selectedStore:e.target.value});
@@ -646,6 +672,12 @@ window.closeAnnouncementModal = () => setState({showAnnouncementModal:false});
 window.startEditItemFromUI = (id,content) => setState({editingItemId:id,editingItemContent:content});
 window.cancelEditItem = () => setState({editingItemId:null,editingItemContent:""});
 window.saveEditItemFromUI = saveEditItem;
+window.disableUserFromUI = disableUser;
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}
 
 onAuthStateChanged(auth, async user => {
   clearSubs();
