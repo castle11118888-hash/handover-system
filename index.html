@@ -6,7 +6,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>交接管理系統｜版本B.4.3</title>
+  <title>交接管理系統｜版本B.4.4.1</title>
   <style>
     :root{
       --bg:#f4f6fb; --card:#fff; --text:#111827; --muted:#6b7280; --border:#e5e7eb;
@@ -100,6 +100,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, addDoc, onSnapshot, getDocs, deleteDoc, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAbQf6eh1KSnZhDZeSqc4RbJDjgIpqNd-I",
@@ -114,6 +115,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 const shifts = ["早班","中班","晚班"]
 const shiftLabel = v => v ? v : "全部班別";
@@ -141,13 +143,14 @@ let state = {
   loginEmail:"",loginPassword:"",
   registerName:"",registerEmail:"",registerPassword:"",
   loginError:"",registerError:"",infoMessage:"",
-  newItemCategory:"人員",newItemContent:"",newItemStatus:"pending",
+  newItemCategory:"人員",newItemContent:"",newItemStatus:"pending",newItemPhotoPreview:"",newItemPhotoName:"",
   newAnnouncementTitle:"",newAnnouncementContent:"",newAnnouncementStore:"all",
   editingItemId:null,editingItemContent:"",
   formsReadFilter:"all",
   showAnnouncementModal:false,lastAnnouncement:null
 };
 let unsubscribers = [];
+let pendingPhotoFile = null;
 
 const clearSubs = () => { unsubscribers.forEach(fn=>{try{fn()}catch(e){}}); unsubscribers=[]; };
 const escapeHtml = s => String(s ?? "").replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
@@ -158,6 +161,35 @@ function highlightText(text, keyword){
   return escapeHtml(src).replace(new RegExp(esc, "gi"), m => `<mark>${m}</mark>`);
 }
 const setState = patch => { Object.assign(state, patch); render(); };
+const revokePhotoPreview = () => {
+  if(state.newItemPhotoPreview && String(state.newItemPhotoPreview).startsWith("blob:")){
+    try{ URL.revokeObjectURL(state.newItemPhotoPreview); }catch(e){}
+  }
+};
+function resetPendingPhoto(){
+  revokePhotoPreview();
+  pendingPhotoFile = null;
+  state.newItemPhotoPreview = "";
+  state.newItemPhotoName = "";
+}
+function selectPhotoFile(file){
+  if(!file){ resetPendingPhoto(); render(); return; }
+  if(!String(file.type||"").startsWith("image/")) return alert("請選擇圖片檔案");
+  if(file.size > 5 * 1024 * 1024) return alert("照片請控制在 5MB 以內");
+  revokePhotoPreview();
+  pendingPhotoFile = file;
+  state.newItemPhotoPreview = URL.createObjectURL(file);
+  state.newItemPhotoName = file.name || "照片";
+  render();
+}
+async function uploadHandverPhoto(file){
+  const ext = (file.name && file.name.includes('.')) ? file.name.split('.').pop().toLowerCase() : 'jpg';
+  const safeExt = ext.replace(/[^a-z0-9]/g,'') || 'jpg';
+  const path = `handover_photos/${effectiveStore()}/${state.selectedDate}/${Date.now()}_${Math.random().toString(36).slice(2)}.${safeExt}`;
+  const photoRef = storageRef(storage, path);
+  await uploadBytes(photoRef, file);
+  return await getDownloadURL(photoRef);
+}
 const normalizeRole = role => role === "manager" ? "general_manager" : role === "supervisor" ? "store_supervisor" : (role || "store_supervisor");
 const roleLabel = role => { const r = normalizeRole(role); return r==="admin"?"管理員":r==="general_manager"?"店長":r==="staff"?"員工":"店主管"; };
 const canViewAllStores = () => ["admin","general_manager"].includes(normalizeRole(state.profile?.role));
@@ -333,19 +365,31 @@ async function resetPassword(){
 async function logout(){
   clearSubs();
   await signOut(auth);
+  resetPendingPhoto();
   setState({currentUser:null,profile:null,users:[],handovers:[],announcements:[],tab:"dashboard",searchText:"",showAnnouncementModal:false});
 }
 async function addItem(){
   const content = state.newItemContent.trim();
   if(!content) return;
   if(!state.selectedShift) return alert("新增交接時請先選擇班別");
-  await addDoc(collection(db,"handovers"),{
-    date:state.selectedDate,shift:state.selectedShift,storeId:effectiveStore(),category:state.newItemCategory,
-    content,status:state.newItemStatus,carried:false,createdByUid:state.currentUser.uid,createdByName:currentUserName(),
-    readBy:[],
-    createdAt:serverTimestamp(),updatedAt:serverTimestamp()
-  });
-  setState({newItemContent:"",newItemCategory:"人員",newItemStatus:"pending"});
+  try{
+    let photoUrl = "", photoName = "";
+    if(pendingPhotoFile){
+      photoUrl = await uploadHandverPhoto(pendingPhotoFile);
+      photoName = pendingPhotoFile.name || "照片";
+    }
+    await addDoc(collection(db,"handovers"),{
+      date:state.selectedDate,shift:state.selectedShift,storeId:effectiveStore(),category:state.newItemCategory,
+      content,status:state.newItemStatus,carried:false,createdByUid:state.currentUser.uid,createdByName:currentUserName(),
+      readBy:[],photoUrl,photoName,
+      createdAt:serverTimestamp(),updatedAt:serverTimestamp()
+    });
+    resetPendingPhoto();
+    setState({newItemContent:"",newItemCategory:"人員",newItemStatus:"pending",newItemPhotoPreview:"",newItemPhotoName:""});
+  }catch(e){
+    console.error(e);
+    alert("照片上傳失敗，請確認 Firebase Storage 已啟用且權限已開放。沒有照片也可先新增文字交接。");
+  }
 }
 async function updateStatus(id,value){
   if(!canEditStatus()) return alert("你沒有修改狀態的權限");
@@ -452,7 +496,7 @@ function renderLogin(root){
       <div class="card weather-hero">
         <div class="weather-row">
           <div>
-            <div class="badge" style="background:rgba(255,255,255,.16);color:#fff">B.4.1 首頁門面版</div>
+            <div class="badge" style="background:rgba(255,255,255,.16);color:#fff">B.4.4.1 首頁門面版</div>
             <div style="height:14px"></div>
             <div class="weather-city">今日天氣資訊</div>
             <div class="weather-desc">${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,"0")}/${String(now.getDate()).padStart(2,"0")}（週${weekdays[now.getDay()]}）　${hh}:${mm}</div>
@@ -589,6 +633,7 @@ function itemCard(item){
       <span class="chip neutral">已讀 ${readNames.length} 人</span>
     </div>
     <div style="margin-top:12px;line-height:1.8">${highlightText(item.content,state.searchText)}</div>
+    ${item.photoUrl ? `<div style="margin-top:12px"><a href="${escapeHtml(item.photoUrl)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(item.photoUrl)}" alt="交接照片" style="width:140px;height:140px;object-fit:cover;border-radius:16px;border:1px solid var(--border)"></a><div class="small muted" style="margin-top:6px">附圖：點照片可放大</div></div>` : ``}
     <div class="small muted" style="margin-top:8px">${escapeHtml(item.createdByName||"")}</div>
     ${readNames.length ? `<div class="small muted" style="margin-top:8px">已讀人員：${escapeHtml(readNames.join("、"))}</div>` : `<div class="small muted" style="margin-top:8px">已讀人員：尚無</div>`}
     <div class="row" style="margin-top:12px">
@@ -610,6 +655,16 @@ function renderForms(){
       <input id="newContent" placeholder="輸入交接內容" value="${escapeHtml(state.newItemContent)}">
       <select id="newStatus">${Object.keys(statuses).map(k=>`<option value="${k}" ${state.newItemStatus===k?"selected":""}>${statuses[k].label}</option>`).join("")}</select>
       <button class="btn primary" onclick="addItemFromUI()">新增</button>
+    </div>
+    <div style="height:10px"></div>
+    <div class="grid2" style="align-items:start">
+      <div>
+        <label class="small muted">交接照片（可不傳，限 1 張 / 5MB 內）</label>
+        <input id="newPhoto" type="file" accept="image/*">
+      </div>
+      <div>
+        ${state.newItemPhotoPreview ? `<div class="small muted" style="margin-bottom:6px">已選照片：${escapeHtml(state.newItemPhotoName||"照片")}</div><div class="row" style="align-items:flex-start"><img src="${escapeHtml(state.newItemPhotoPreview)}" alt="預覽" style="width:140px;height:140px;object-fit:cover;border-radius:16px;border:1px solid var(--border)"><button class="btn secondary" onclick="clearNewPhotoFromUI()">移除照片</button></div>` : `<div class="small muted">尚未選擇照片</div>`}
+      </div>
     </div>
   </div>
   <div class="card section">
@@ -771,6 +826,7 @@ function renderHistory(){
           <span class="chip ${statuses[i.status]?.cls||"neutral"}">${escapeHtml(statuses[i.status]?.label||i.status)}</span>
         </div>
         <div style="margin-top:10px">${escapeHtml(i.content)}</div>
+        ${i.photoUrl ? `<div style="margin-top:10px"><a href="${escapeHtml(i.photoUrl)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(i.photoUrl)}" alt="交接照片" style="width:120px;height:120px;object-fit:cover;border-radius:16px;border:1px solid var(--border)"></a></div>` : ``}
         <div class="small muted" style="margin-top:8px">${escapeHtml(i.createdByName||"")}</div>
         <div class="small muted" style="margin-top:8px">${itemReadByCurrentUser(i) ? "我已讀" : "我未讀"}</div>
       </div>`).join("")}</div>` : `<div class="empty">查無資料</div>`}
@@ -836,7 +892,7 @@ function renderApp(root){
         ${canManageUsers() ? `<button class="navbtn ${state.tab==="users"?"active":""}" onclick="switchTab('users')">帳號</button>` : ""}
         <div style="height:14px"></div>
         <div class="okbox small">
-          版本 B.4.3 已啟用：<br>
+          版本 B.4.4.1 已啟用：<br>
           ・角色中文顯示<br>
           ・角色儲存修正<br>
           ・帳號頁操作優化<br>
@@ -881,6 +937,7 @@ function renderApp(root){
   const nc = document.getElementById("newCategory"); if(nc) nc.onchange = e => state.newItemCategory = e.target.value;
   const nct = document.getElementById("newContent"); if(nct) nct.oninput = e => state.newItemContent = e.target.value;
   const ns = document.getElementById("newStatus"); if(ns) ns.onchange = e => state.newItemStatus = e.target.value;
+  const np = document.getElementById("newPhoto"); if(np) np.onchange = e => selectPhotoFile((e.target.files||[])[0]);
   const at = document.getElementById("annTitle"); if(at) at.oninput = e => state.newAnnouncementTitle = e.target.value;
   const ac = document.getElementById("annContent"); if(ac) ac.oninput = e => state.newAnnouncementContent = e.target.value;
   const ast = document.getElementById("annStore"); if(ast) ast.onchange = e => state.newAnnouncementStore = e.target.value;
@@ -936,6 +993,7 @@ window.openStoreFromUI = openStore;
 window.openStoreStatusFromUI = openStoreStatus;
 window.openHistoryStatusFromUI = openHistoryStatus;
 window.addItemFromUI = addItem;
+window.clearNewPhotoFromUI = () => { resetPendingPhoto(); render(); };
 window.updateStatusFromUI = updateStatus;
 window.deleteItemFromUI = deleteItem;
 window.toggleReadStatusFromUI = toggleReadStatus;
@@ -985,6 +1043,7 @@ onAuthStateChanged(auth, async user => {
     setState({currentUser:user,authReady:true});
     await ensureProfile(user);
   }else{
+    resetPendingPhoto();
     setState({currentUser:null,profile:null,authReady:true,users:[],handovers:[],announcements:[],showAnnouncementModal:false});
   }
 });
