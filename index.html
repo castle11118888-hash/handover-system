@@ -131,7 +131,7 @@ function highlightText(text, keyword){
 }
 const setState = patch => { Object.assign(state, patch); render(); };
 const normalizeRole = role => role === "manager" ? "general_manager" : role === "supervisor" ? "store_supervisor" : (role || "store_supervisor");
-const roleLabel = role => { const r = normalizeRole(role); return r==="admin"?"管理員":r==="general_manager"?"總經理":r==="staff"?"員工":"店主管"; };
+const roleLabel = role => { const r = normalizeRole(role); return r==="admin"?"管理員":r==="general_manager"?"店長":r==="staff"?"員工":"店主管"; };
 const canViewAllStores = () => ["admin","general_manager"].includes(normalizeRole(state.profile?.role));
 const canManageUsers = () => normalizeRole(state.profile?.role) === "admin";
 const canPostAnnouncements = () => ["admin","general_manager"].includes(normalizeRole(state.profile?.role));
@@ -281,7 +281,7 @@ async function saveEditItem(){
   setState({editingItemId:null,editingItemContent:""});
 }
 async function addAnnouncement(){
-  if(!canPostAnnouncements()) return alert("只有管理員或總經理可發公告");
+  if(!canPostAnnouncements()) return alert("只有管理員或店長可發公告");
   const title = state.newAnnouncementTitle.trim(), content = state.newAnnouncementContent.trim();
   if(!title || !content) return;
   await addDoc(collection(db,"announcements"),{
@@ -320,12 +320,12 @@ function renderLogin(root){
   root.innerHTML = `
   <div class="login-wrap">
     <div class="card hero">
-      <div class="badge">版本 B.2.4</div>
+      <div class="badge">版本 B.2.5</div>
       <div class="title" style="margin-top:12px">交接管理系統</div>
-      <p class="muted" style="font-size:18px;line-height:1.8">版本 B.2.4 已加入：角色中文化、角色儲存修正、帳號管理優化、歷史查詢、密碼重設、手機版優化。</p>
+      <p class="muted" style="font-size:18px;line-height:1.8">版本 B.2.5 已加入：角色中文化、角色儲存修正、帳號管理優化、歷史查詢、密碼重設、手機版優化。</p>
       <div class="grid4" style="margin-top:18px">
         <div class="card stat"><div class="sub">角色權限</div><div class="num">完整</div><div class="sub">顯示修正完成</div></div>
-        <div class="card stat"><div class="sub">公告</div><div class="num">可刪</div><div class="sub">管理員 / 總經理</div></div>
+        <div class="card stat"><div class="sub">公告</div><div class="num">可刪</div><div class="sub">管理員 / 店長</div></div>
         <div class="card stat"><div class="sub">交接</div><div class="num">可編輯</div><div class="sub">主管以上</div></div>
         <div class="card stat"><div class="sub">歷史</div><div class="num">可查</div><div class="sub">依日期店別班別</div></div>
       </div>
@@ -497,7 +497,7 @@ function renderUsers(){
   return `
   <div class="card section">
     <h2>帳號管理</h2>
-    <div class="okbox">管理員可調整角色與店別。角色已改為中文顯示；管理員 / 總經理不綁店別，店主管 / 員工需指定店別。</div>
+    <div class="okbox">管理員可調整角色與店別。角色已改為中文顯示；管理員 / 店長不綁店別，店主管 / 員工需指定店別。</div>
   </div>
   <div class="card section">
     <table class="table">
@@ -516,7 +516,7 @@ function renderUsers(){
             <td>
               <select id="role_${u.id}" ${disabled}>
                 <option value="admin" ${role==="admin"?"selected":""}>管理員</option>
-                <option value="general_manager" ${role==="general_manager"?"selected":""}>總經理</option>
+                <option value="general_manager" ${role==="general_manager"?"selected":""}>店長</option>
                 <option value="store_supervisor" ${role==="store_supervisor"?"selected":""}>店主管</option>
                 <option value="staff" ${role==="staff"?"selected":""}>員工</option>
               </select>
@@ -615,7 +615,7 @@ function renderApp(root){
         ${canManageUsers() ? `<button class="navbtn ${state.tab==="users"?"active":""}" onclick="switchTab('users')">帳號</button>` : ""}
         <div style="height:14px"></div>
         <div class="okbox small">
-          版本 B.2.4 已啟用：<br>
+          版本 B.2.5 已啟用：<br>
           ・角色中文顯示<br>
           ・角色儲存修正<br>
           ・帳號頁操作優化<br>
