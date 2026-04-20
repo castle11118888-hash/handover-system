@@ -108,6 +108,7 @@ const today = () => {
 let state = {
   authReady:false,currentUser:null,profile:null,
   users:[],handovers:[],announcements:[],stores:storesSeed,
+  storeDrafts:{},
   tab:"dashboard",searchText:"",
   selectedDate:today(),selectedShift:"晚班",selectedStore:"A",
   historyDate:"",historyStore:"A",historyShift:"",
@@ -142,6 +143,8 @@ const currentUserName = () => state.profile?.name || state.currentUser?.email ||
 const profileStoreId = profile => String(profile?.storeId || profile?.store || "").replace("店","");
 const visibleStores = () => canViewAllStores() ? state.stores : state.stores.filter(s => s.id === profileStoreId(state.profile));
 const effectiveStore = () => canViewAllStores() ? state.selectedStore : (profileStoreId(state.profile) || "A");
+const storeNameById = id => (state.stores.find(s => s.id===id)?.name || `${id}店`);
+const canManageStores = () => normalizeRole(state.profile?.role) === "admin";
 
 function dashboardRows(){
   return visibleStores().map(store => {
@@ -225,6 +228,17 @@ function subscribeData(){
     setState({ announcements:rows, lastAnnouncement:rows[0]||null, showAnnouncementModal:!!(rows[0]&&state.currentUser) });
   }));
   unsubscribers.push(onSnapshot(collection(db,"users"), snap => setState({users:snap.docs.map(d=>({id:d.id,...d.data(),role:normalizeRole(d.data().role)}))})));
+  unsubscribers.push(onSnapshot(collection(db,"stores"), async snap => {
+    if(snap.empty){
+      for(const s of storesSeed){
+        await setDoc(doc(db,"stores",s.id), s, {merge:true});
+      }
+      setState({stores:storesSeed, storeDrafts:Object.fromEntries(storesSeed.map(s=>[s.id,s.name]))});
+      return;
+    }
+    const rows = snap.docs.map(d => ({id:d.id,...d.data()})).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+    setState({stores:rows, storeDrafts:Object.fromEntries(rows.map(s=>[s.id,s.name || `${s.id}店`]))});
+  }));
 }
 
 async function login(){
@@ -313,6 +327,16 @@ async function disableUser(uid){
   if(state.currentUser && uid===state.currentUser.uid) return alert("不能刪除目前登入的管理員本人");
   if(!confirm("確定要刪除這個帳號嗎？刪除後此帳號將無法登入。")) return;
   await updateDoc(doc(db,"users",uid),{active:false,deletedAt:serverTimestamp()});
+}
+async function saveStoreName(id){
+  if(!canManageStores()) return alert("只有管理員可修改店別名稱");
+  const name = String(state.storeDrafts?.[id] || "").trim();
+  if(!name) return alert("請輸入店別名稱");
+  await setDoc(doc(db,"stores",id),{id,name},{merge:true});
+  alert("店別名稱已更新");
+}
+function updateStoreDraft(id,value){
+  setState({storeDrafts:{...state.storeDrafts,[id]:value}});
 }
 const openStore = id => setState({selectedStore:id,tab:"forms"});
 
@@ -497,8 +521,22 @@ function renderUsers(){
   return `
   <div class="card section">
     <h2>帳號管理</h2>
-    <div class="okbox">管理員可調整角色與店別。角色已改為中文顯示；管理員 / 店長不綁店別，店主管 / 員工需指定店別。</div>
+    <div class="okbox">管理員可調整角色與店別，也可修改店別名稱。角色已改為中文顯示；管理員 / 店長不綁店別，店主管 / 員工需指定店別。</div>
   </div>
+  ${canManageStores() ? `
+  <div class="card section">
+    <h2>店別名稱管理</h2>
+    <div class="list">
+      ${state.stores.map(s => `
+        <div class="item">
+          <div class="row" style="justify-content:space-between;align-items:center;gap:12px">
+            <div style="min-width:90px;font-weight:800">${escapeHtml(s.id)}</div>
+            <input value="${escapeHtml(state.storeDrafts?.[s.id] ?? s.name)}" oninput="updateStoreDraftFromUI('${s.id}', this.value)">
+            <button class="btn primary" onclick="saveStoreNameFromUI('${s.id}')">儲存名稱</button>
+          </div>
+        </div>`).join("")}
+    </div>
+  </div>` : ""}
   <div class="card section">
     <table class="table">
       <thead><tr><th>帳號</th><th>姓名 / Email</th><th>狀態</th><th>角色</th><th>店別</th><th>目前權限</th><th>動作</th></tr></thead>
@@ -615,12 +653,13 @@ function renderApp(root){
         ${canManageUsers() ? `<button class="navbtn ${state.tab==="users"?"active":""}" onclick="switchTab('users')">帳號</button>` : ""}
         <div style="height:14px"></div>
         <div class="okbox small">
-          版本 B.2.5 已啟用：<br>
+          版本 B.2.6 已啟用：<br>
           ・角色中文顯示<br>
           ・角色儲存修正<br>
           ・帳號頁操作優化<br>
           ・歷史查詢<br>
           ・密碼重設
+          ・店別名稱管理
         </div>
       </div>
       <div class="content">${main}</div>
@@ -705,6 +744,8 @@ window.startEditItemFromUI = (id,content) => setState({editingItemId:id,editingI
 window.cancelEditItem = () => setState({editingItemId:null,editingItemContent:""});
 window.saveEditItemFromUI = saveEditItem;
 window.disableUserFromUI = disableUser;
+window.saveStoreNameFromUI = saveStoreName;
+window.updateStoreDraftFromUI = updateStoreDraft;
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
