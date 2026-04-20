@@ -6,7 +6,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>交接管理系統｜版本B.2.8</title>
+  <title>交接管理系統｜版本B.2.9</title>
   <style>
     :root{
       --bg:#f4f6fb; --card:#fff; --text:#111827; --muted:#6b7280; --border:#e5e7eb;
@@ -57,7 +57,7 @@
     .badge{display:inline-block;background:#eef2ff;color:#4338ca;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:800}
     .empty{padding:26px;text-align:center;border-radius:16px;background:#f8fafc;color:var(--muted)}
     mark{background:#fde68a;padding:0 2px;border-radius:4px}
-    .table{width:100%;border-collapse:collapse}.table th,.table td{padding:10px;border-bottom:1px solid var(--border);text-align:left;font-size:14px;vertical-align:top}
+    .table{width:100%;border-collapse:separate;border-spacing:0}.table th,.table td{padding:12px 10px;border-bottom:1px solid var(--border);text-align:left;font-size:14px;vertical-align:middle}.table th{white-space:nowrap;color:var(--primary);font-weight:800}.table td input,.table td select{min-height:44px}.account-table .col-account{width:17%}.account-table .col-name{width:13%}.account-table .col-email{width:18%}.account-table .col-status{width:8%}.account-table .col-role{width:10%}.account-table .col-store{width:9%}.account-table .col-permission{width:12%}.account-table .col-password{width:7%}.account-table .col-actions{width:6%}.account-actions{display:flex;flex-direction:column;gap:10px;align-items:stretch}.account-actions .btn{width:100%}.permission-chip{display:inline-flex;align-items:center;justify-content:center;min-width:88px;line-height:1.4;text-align:center;white-space:normal}.store-manage-row{display:grid;grid-template-columns:90px minmax(0,1fr) 120px;gap:12px;align-items:center}@media (max-width:980px){.account-table,.account-table thead,.account-table tbody,.account-table th,.account-table td,.account-table tr{display:block}.account-table thead{display:none}.account-table tr{border:1px solid var(--border);border-radius:18px;padding:14px;margin-bottom:12px;background:#fff}.account-table td{border-bottom:none;padding:8px 0}.account-table td::before{content:attr(data-label);display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:700}.account-actions{flex-direction:row}.store-manage-row{grid-template-columns:1fr}} 
     .w240{width:240px}.w180{width:180px}.w140{width:140px}
     .loading{padding:40px;text-align:center;color:var(--muted)}
     .modalbg{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:16px}
@@ -352,9 +352,9 @@ function renderLogin(root){
   root.innerHTML = `
   <div class="login-wrap">
     <div class="card hero">
-      <div class="badge">版本 B.2.8</div>
+      <div class="badge">版本 B.2.9</div>
       <div class="title" style="margin-top:12px">交接管理系統</div>
-      <p class="muted" style="font-size:18px;line-height:1.8">版本 B.2.8 已加入：角色中文化、角色儲存修正、帳號管理優化、歷史查詢、密碼重設、手機版優化。</p>
+      <p class="muted" style="font-size:18px;line-height:1.8">版本 B.2.9 已加入：角色中文化、角色儲存修正、帳號管理優化、歷史查詢、密碼重設、手機版優化。</p>
       <div class="grid4" style="margin-top:18px">
         <div class="card stat"><div class="sub">角色權限</div><div class="num">完整</div><div class="sub">顯示修正完成</div></div>
         <div class="card stat"><div class="sub">公告</div><div class="num">可刪</div><div class="sub">管理員 / 店長</div></div>
@@ -538,8 +538,8 @@ function renderUsers(){
     <div class="list">
       ${state.stores.map(s => `
         <div class="item">
-          <div class="row" style="justify-content:space-between;align-items:center;gap:12px">
-            <div style="min-width:90px;font-weight:800">${escapeHtml(s.id)}</div>
+          <div class="store-manage-row">
+            <div style="font-weight:800">${escapeHtml(s.id)}</div>
             <input id="store_name_${s.id}" value="${escapeHtml(s.name)}" placeholder="請輸入店名">
             <button class="btn primary" onclick="saveStoreNameFromUI('${s.id}')">儲存名稱</button>
           </div>
@@ -547,8 +547,8 @@ function renderUsers(){
     </div>
   </div>` : ""}
   <div class="card section">
-    <table class="table">
-      <thead><tr><th>帳號</th><th>姓名</th><th>Email</th><th>狀態</th><th>角色</th><th>店別</th><th>目前權限</th><th>密碼</th><th>動作</th></tr></thead>
+    <table class="table account-table">
+      <thead><tr><th class="col-account">帳號</th><th class="col-name">姓名</th><th class="col-email">Email</th><th class="col-status">狀態</th><th class="col-role">角色</th><th class="col-store">店別</th><th class="col-permission">目前權限</th><th class="col-password">密碼</th><th class="col-actions">動作</th></tr></thead>
       <tbody>
         ${state.users.map(u => {
           const role = normalizeRole(u.role);
@@ -558,11 +558,11 @@ function renderUsers(){
           const storeText = ["admin","general_manager"].includes(role) ? "全店" : ((state.stores.find(s => s.id===String(u.storeId||u.store||''))?.name) || ((u.storeId||u.store) ? `${u.storeId||u.store}店` : "未設定"));
           return `
           <tr>
-            <td>${escapeHtml(u.username||u.email||"-")}</td>
-            <td><input id="name_${u.id}" value="${escapeHtml(u.name||"")}" placeholder="請輸入姓名" ${disabled}></td>
-            <td>${escapeHtml(email||"-")}</td>
-            <td>${u.active===false?'<span class="chip warn">已停用</span>':'<span class="chip ok">正常</span>'}</td>
-            <td>
+            <td data-label="帳號">${escapeHtml(u.username||u.email||"-")}</td>
+            <td data-label="姓名"><input id="name_${u.id}" value="${escapeHtml(u.name||"")}" placeholder="請輸入姓名" ${disabled}></td>
+            <td data-label="Email">${escapeHtml(email||"-")}</td>
+            <td data-label="狀態">${u.active===false?'<span class="chip warn">已停用</span>':'<span class="chip ok">正常</span>'}</td>
+            <td data-label="角色">
               <select id="role_${u.id}" ${disabled}>
                 <option value="admin" ${role==="admin"?"selected":""}>管理員</option>
                 <option value="general_manager" ${role==="general_manager"?"selected":""}>店長</option>
@@ -570,10 +570,10 @@ function renderUsers(){
                 <option value="staff" ${role==="staff"?"selected":""}>員工</option>
               </select>
             </td>
-            <td><select id="store_${u.id}" ${disabled}><option value="">-</option>${storeOptionsHtml(u.storeId||"")}</select></td>
-            <td><span class="chip info">${escapeHtml(roleLabel(role))}｜${escapeHtml(storeText)}</span></td>
-            <td>${email ? `<button class="btn warn" onclick="sendUserPasswordResetFromUI(${JSON.stringify(email).replace(/"/g,'&quot;')})" ${disabled}>寄重設信</button>` : `<span class="small muted">無 Email</span>`}</td>
-            <td><div class="row"><button class="btn secondary" onclick="saveUserRoleFromUI('${u.id}')" ${disabled}>儲存</button><button class="btn danger" onclick="disableUserFromUI('${u.id}')" ${selfDisabled}>刪除</button></div></td>
+            <td data-label="店別"><select id="store_${u.id}" ${disabled}><option value="">-</option>${storeOptionsHtml(u.storeId||"")}</select></td>
+            <td data-label="目前權限"><span class="chip info permission-chip">${escapeHtml(roleLabel(role))}<br>${escapeHtml(storeText)}</span></td>
+            <td data-label="密碼">${email ? `<button class="btn warn" onclick="sendUserPasswordResetFromUI(${JSON.stringify(email).replace(/"/g,'&quot;')})" ${disabled}>寄重設信</button>` : `<span class="small muted">無 Email</span>`}</td>
+            <td data-label="動作"><div class="account-actions"><button class="btn secondary" onclick="saveUserRoleFromUI('${u.id}')" ${disabled}>儲存</button><button class="btn danger" onclick="disableUserFromUI('${u.id}')" ${selfDisabled}>刪除</button></div></td>
           </tr>`;
         }).join("")}
       </tbody>
@@ -666,7 +666,7 @@ function renderApp(root){
         ${canManageUsers() ? `<button class="navbtn ${state.tab==="users"?"active":""}" onclick="switchTab('users')">帳號</button>` : ""}
         <div style="height:14px"></div>
         <div class="okbox small">
-          版本 B.2.8 已啟用：<br>
+          版本 B.2.9 已啟用：<br>
           ・角色中文顯示<br>
           ・角色儲存修正<br>
           ・帳號頁操作優化<br>
