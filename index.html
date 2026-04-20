@@ -6,7 +6,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>交接管理系統｜版本B.4.10</title>
+  <title>交接管理系統｜版本B.4.12</title>
   <style>
     :root{
       --bg:#f4f6fb; --card:#fff; --text:#111827; --muted:#6b7280; --border:#e5e7eb;
@@ -290,7 +290,7 @@ function subscribeData(){
   unsubscribers.push(onSnapshot(collection(db,"announcements"), snap => {
     const rows = snap.docs.map(d=>({id:d.id,...d.data()}));
     rows.sort((a,b) => String(b.createdAt?.seconds||0).localeCompare(String(a.createdAt?.seconds||0)));
-    setState({ announcements:rows, lastAnnouncement:rows[0]||null, showAnnouncementModal:!!(rows[0]&&state.currentUser) });
+    setState({ announcements:rows, lastAnnouncement:rows[0]||null, showAnnouncementModal:!!(rows[0]&&state.currentUser&&!isAnnouncementRead(rows[0].id)) });
   }));
   unsubscribers.push(onSnapshot(collection(db,"users"), snap => setState({users:snap.docs.map(d=>({id:d.id,...d.data(),role:normalizeRole(d.data().role)}))})));
   unsubscribers.push(onSnapshot(collection(db,"stores"), async snap => {
@@ -378,6 +378,14 @@ async function addAnnouncement(){
   });
   setState({newAnnouncementTitle:"",newAnnouncementContent:"",newAnnouncementStore:"all"});
 }
+
+async function markAnnRead(id){
+  if(!currentUid()) return;
+  await updateDoc(doc(db,"announcements",id),{
+    readBy: arrayUnion(currentUid())
+  });
+}
+
 async function deleteAnnouncement(id){
   if(!canPostAnnouncements()) return alert("你沒有刪除公告權限");
   await deleteDoc(doc(db,"announcements",id));
@@ -452,7 +460,7 @@ function renderLogin(root){
       <div class="card weather-hero">
         <div class="weather-row">
           <div>
-            <div class="badge" style="background:rgba(255,255,255,.16);color:#fff">B.4.10 首頁門面版</div>
+            <div class="badge" style="background:rgba(255,255,255,.16);color:#fff">B.4.12 首頁門面版</div>
             <div style="height:14px"></div>
             <div class="weather-city">今日天氣資訊</div>
             <div class="weather-desc">${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,"0")}/${String(now.getDate()).padStart(2,"0")}（週${weekdays[now.getDay()]}）　${hh}:${mm}</div>
@@ -489,7 +497,7 @@ function renderLogin(root){
           <input id="loginPassword" type="password" placeholder="至少 6 碼" value="${escapeHtml(state.loginPassword)}">
         </div>
         ${state.loginError ? `<div class="warnbox">${escapeHtml(state.loginError)}</div>` : ""}
-        <div class="row">
+        <div class="row"><button class="btn secondary" onclick="markAnnReadFromUI(a.id)">已讀</button>
           <button class="btn primary" style="flex:1" onclick="loginFromUI()">員工登入</button>
           <button class="btn secondary" style="flex:1" onclick="resetPasswordFromUI()">忘記密碼</button>
         </div>
@@ -787,17 +795,30 @@ function renderHistory(){
   </div>`;
 }
 
+
+function announcementRead(id){
+  const read = JSON.parse(localStorage.getItem("ann_read") || "[]");
+  if(!read.includes(id)){
+    read.push(id);
+    localStorage.setItem("ann_read", JSON.stringify(read));
+  }
+}
+function isAnnouncementRead(id){
+  const read = JSON.parse(localStorage.getItem("ann_read") || "[]");
+  return read.includes(id);
+}
+
 function renderAnnouncementModal(){
   if(!state.showAnnouncementModal || !state.lastAnnouncement) return "";
   return `
-  <div class="modalbg" onclick="closeAnnouncementModal()">
+  <div class="modalbg" onclick="announcementRead(state.lastAnnouncement.id);closeAnnouncementModal()">
     <div class="modal" onclick="event.stopPropagation()">
       <div class="badge">最新公告</div>
       <h2 style="margin:12px 0 8px">${escapeHtml(state.lastAnnouncement.title||"")}</h2>
       <div class="small muted">${escapeHtml(state.lastAnnouncement.createdByName||"")}</div>
       <div style="margin-top:12px;line-height:1.8">${escapeHtml(state.lastAnnouncement.content||"")}</div>
       <div style="height:16px"></div>
-      <button class="btn primary" style="width:100%" onclick="closeAnnouncementModal()">我知道了</button>
+      <button class="btn primary" style="width:100%" onclick="announcementRead(state.lastAnnouncement.id);closeAnnouncementModal()">我知道了</button>
     </div>
   </div>`;
 }
@@ -846,7 +867,7 @@ function renderApp(root){
         ${canManageUsers() ? `<button class="navbtn ${state.tab==="users"?"active":""}" onclick="switchTab('users')">帳號</button>` : ""}
         <div style="height:14px"></div>
         <div class="okbox small">
-          版本 B.4.10 已啟用：<br>
+          版本 B.4.12 已啟用：<br>
           ・角色中文顯示<br>
           ・角色儲存修正<br>
           ・帳號頁操作優化<br>
@@ -955,6 +976,7 @@ window.deleteItemFromUI = deleteItem;
 window.toggleReadStatusFromUI = toggleReadStatus;
 window.addAnnouncementFromUI = addAnnouncement;
 window.deleteAnnouncementFromUI = deleteAnnouncement;
+window.markAnnReadFromUI = markAnnRead;
 window.switchTab = tab => setState({tab});
 window.resetFiltersFromUI = () => setState({searchText:"",formsStatusFilter:"",historyStatusFilter:"",selectedDate:today(),selectedShift:"",selectedStore:canViewAllStores()?"A":(profileStoreId(state.profile)||"A")});
 window.setFormsStatusFilterFromUI = status => setState({formsStatusFilter:status,tab:"forms"});
