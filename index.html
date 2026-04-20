@@ -191,16 +191,29 @@ function globalResults(){
   const q = state.searchText.trim().toLowerCase();
   if(!q) return {stores:[],items:[],announcements:[],users:[]};
   const stores = visibleStores().filter(s => s.id.toLowerCase().includes(q) || s.name.toLowerCase().includes(q));
-  const items = visibleStores().flatMap(store => state.handovers
-    .filter(h => h.date===state.selectedDate && h.shift===state.selectedShift && h.storeId===store.id)
-    .filter(i => String(i.content).toLowerCase().includes(q) || String(i.category).toLowerCase().includes(q))
-    .map(i => ({...i,storeName:store.name})));
+  const visibleStoreIds = new Set(visibleStores().map(s => s.id));
+  const items = state.handovers
+    .filter(h => visibleStoreIds.has(h.storeId))
+    .filter(i =>
+      String(i.content||"").toLowerCase().includes(q) ||
+      String(i.category||"").toLowerCase().includes(q) ||
+      String(i.createdByName||"").toLowerCase().includes(q) ||
+      String(i.date||"").toLowerCase().includes(q) ||
+      String(i.shift||"").toLowerCase().includes(q) ||
+      String(i.storeId||"").toLowerCase().includes(q)
+    )
+    .map(i => {
+      const store = state.stores.find(s => s.id===i.storeId);
+      return {...i,storeName:store?.name||`${i.storeId}店`};
+    })
+    .sort((a,b) => `${b.date||""}${b.shift||""}`.localeCompare(`${a.date||""}${a.shift||""}`));
   const announcements = state.announcements.filter(a => {
     const canView = !a.targetStoreId || a.targetStoreId===effectiveStore() || canViewAllStores();
     return canView && (String(a.title).toLowerCase().includes(q) || String(a.content).toLowerCase().includes(q) || String(a.createdByName||"").toLowerCase().includes(q));
   });
   const users = canManageUsers() ? state.users.filter(u =>
     String(u.username||u.email||"").toLowerCase().includes(q) ||
+    String(u.name||"").toLowerCase().includes(q) ||
     String(u.role||"").toLowerCase().includes(q) ||
     String(u.storeId||u.store||"").toLowerCase().includes(q)
   ) : [];
@@ -481,7 +494,7 @@ function renderDashboard(){
     <h2>全站搜尋</h2>
     <div class="list">
       <div class="item"><div class="small muted">店別 ${results.stores.length}</div>${results.stores.length ? results.stores.map(s=>`<div style="margin-top:8px">${highlightText(`${s.id}｜${s.name}`,state.searchText)}</div>`).join("") : '<div class="empty">找不到店別</div>'}</div>
-      <div class="item"><div class="small muted">交接 ${results.items.length}</div>${results.items.length ? results.items.map(i=>`<div style="margin-top:10px"><div class="small muted">${escapeHtml(i.storeName)}｜${escapeHtml(i.category)}</div><div>${highlightText(i.content,state.searchText)}</div></div>`).join("") : '<div class="empty">找不到交接</div>'}</div>
+      <div class="item"><div class="small muted">交接 ${results.items.length}</div>${results.items.length ? results.items.map(i=>`<div style="margin-top:10px"><div class="small muted">${escapeHtml(i.date||"")}｜${escapeHtml(i.shift||"")}｜${escapeHtml(i.storeName)}｜${escapeHtml(i.category)}</div><div>${highlightText(i.content,state.searchText)}</div></div>`).join("") : '<div class="empty">找不到交接</div>'}</div>
       <div class="item"><div class="small muted">公告 ${results.announcements.length}</div>${results.announcements.length ? results.announcements.map(a=>`<div style="margin-top:10px"><div style="font-weight:800">${highlightText(a.title,state.searchText)}</div><div class="small muted">${escapeHtml(a.createdByName||"")}</div><div>${highlightText(a.content,state.searchText)}</div></div>`).join("") : '<div class="empty">找不到公告</div>'}</div>
       ${canManageUsers() ? `<div class="item"><div class="small muted">帳號 ${results.users.length}</div>${results.users.length ? results.users.map(u=>`<div style="margin-top:10px">${highlightText(`${u.username||u.email}｜${normalizeRole(u.role)}｜${u.storeId||u.store||"-"}`,state.searchText)}</div>`).join("") : '<div class="empty">找不到帳號</div>'}</div>` : ""}
     </div>
