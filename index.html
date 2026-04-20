@@ -6,7 +6,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>交接管理系統｜版本B.4.8</title>
+  <title>交接管理系統｜版本B.4.9</title>
   <style>
     :root{
       --bg:#f4f6fb; --card:#fff; --text:#111827; --muted:#6b7280; --border:#e5e7eb;
@@ -452,7 +452,7 @@ function renderLogin(root){
       <div class="card weather-hero">
         <div class="weather-row">
           <div>
-            <div class="badge" style="background:rgba(255,255,255,.16);color:#fff">B.4.8 首頁門面版</div>
+            <div class="badge" style="background:rgba(255,255,255,.16);color:#fff">B.4.9 首頁門面版</div>
             <div style="height:14px"></div>
             <div class="weather-city">今日天氣資訊</div>
             <div class="weather-desc">${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,"0")}/${String(now.getDate()).padStart(2,"0")}（週${weekdays[now.getDay()]}）　${hh}:${mm}</div>
@@ -668,7 +668,7 @@ function renderAnnouncements(){
                 <div class="small muted">${escapeHtml(a.createdByName||"")}</div>
               </div>
               <div class="row">
-                <div class="chip">${a.targetStoreId ? escapeHtml(a.targetStoreId+"店") : "全店"}</div>
+                <div class="chip">${a.targetStoreId ? escapeHtml(storeNameById(a.targetStoreId)) : "全店"}</div>
                 ${canPostAnnouncements() ? `<button class="btn danger" onclick="deleteAnnouncementFromUI('${a.id}')">刪除</button>` : ""}
               </div>
             </div>
@@ -846,7 +846,7 @@ function renderApp(root){
         ${canManageUsers() ? `<button class="navbtn ${state.tab==="users"?"active":""}" onclick="switchTab('users')">帳號</button>` : ""}
         <div style="height:14px"></div>
         <div class="okbox small">
-          版本 B.4.8 已啟用：<br>
+          版本 B.4.9 已啟用：<br>
           ・角色中文顯示<br>
           ・角色儲存修正<br>
           ・帳號頁操作優化<br>
