@@ -6,7 +6,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>交接管理系統｜版本B.4.0</title>
+  <title>交接管理系統｜版本B.4.2</title>
   <style>
     :root{
       --bg:#f4f6fb; --card:#fff; --text:#111827; --muted:#6b7280; --border:#e5e7eb;
@@ -98,7 +98,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, addDoc, onSnapshot, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, addDoc, onSnapshot, getDocs, deleteDoc, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAbQf6eh1KSnZhDZeSqc4RbJDjgIpqNd-I",
@@ -143,6 +143,7 @@ let state = {
   newItemCategory:"人員",newItemContent:"",newItemStatus:"pending",
   newAnnouncementTitle:"",newAnnouncementContent:"",newAnnouncementStore:"all",
   editingItemId:null,editingItemContent:"",
+  formsReadFilter:"all",
   showAnnouncementModal:false,lastAnnouncement:null
 };
 let unsubscribers = [];
@@ -198,7 +199,8 @@ const filteredItems = () => {
   return currentItems().filter(i => {
     const matchStatus = !state.formsStatusFilter || i.status===state.formsStatusFilter;
     const matchText = !q || String(i.content).toLowerCase().includes(q) || String(i.category).toLowerCase().includes(q);
-    return matchStatus && matchText;
+    const matchRead = state.formsReadFilter==="all" ? true : state.formsReadFilter==="read" ? itemReadByCurrentUser(i) : !itemReadByCurrentUser(i);
+    return matchStatus && matchText && matchRead;
   });
 };
 const statusQuickLinks = [
@@ -207,6 +209,9 @@ const statusQuickLinks = [
   { key:"pending", label:"待處理", cls:"neutral" },
   { key:"pending_followup", label:"待追蹤", cls:"warn" }
 ];
+const currentUid = () => state.currentUser?.uid || "";
+const itemReadByCurrentUser = item => Array.isArray(item?.readBy) && currentUid() ? item.readBy.includes(currentUid()) : false;
+const itemReadNames = item => Array.isArray(item?.readBy) ? item.readBy.map(uid => state.users.find(u => u.id===uid)?.name || state.users.find(u => u.id===uid)?.email).filter(Boolean) : [];
 const historyItems = () => state.handovers
   .filter(h => (!state.historyDate || h.date===state.historyDate) && (!state.historyShift || h.shift===state.historyShift) && (!state.historyStatusFilter || h.status===state.historyStatusFilter) && h.storeId===state.historyStore)
   .sort((a,b) => `${b.date}${b.shift}`.localeCompare(`${a.date}${a.shift}`));
@@ -328,6 +333,7 @@ async function addItem(){
   await addDoc(collection(db,"handovers"),{
     date:state.selectedDate,shift:state.selectedShift,storeId:effectiveStore(),category:state.newItemCategory,
     content,status:state.newItemStatus,carried:false,createdByUid:state.currentUser.uid,createdByName:currentUserName(),
+    readBy:[],
     createdAt:serverTimestamp(),updatedAt:serverTimestamp()
   });
   setState({newItemContent:"",newItemCategory:"人員",newItemStatus:"pending"});
@@ -335,6 +341,13 @@ async function addItem(){
 async function updateStatus(id,value){
   if(!canEditStatus()) return alert("你沒有修改狀態的權限");
   await updateDoc(doc(db,"handovers",id),{status:value,updatedAt:serverTimestamp()});
+}
+async function toggleReadStatus(id,markRead){
+  if(!currentUid()) return;
+  await updateDoc(doc(db,"handovers",id),{
+    readBy: markRead ? arrayUnion(currentUid()) : arrayRemove(currentUid()),
+    updatedAt: serverTimestamp()
+  });
 }
 async function deleteItem(id){
   if(!canDeleteItem()) return alert("只有管理員可刪除");
@@ -430,7 +443,7 @@ function renderLogin(root){
       <div class="card weather-hero">
         <div class="weather-row">
           <div>
-            <div class="badge" style="background:rgba(255,255,255,.16);color:#fff">B.4.0 首頁門面版</div>
+            <div class="badge" style="background:rgba(255,255,255,.16);color:#fff">B.4.1 首頁門面版</div>
             <div style="height:14px"></div>
             <div class="weather-city">今日天氣資訊</div>
             <div class="weather-desc">${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,"0")}/${String(now.getDate()).padStart(2,"0")}（週${weekdays[now.getDay()]}）　${hh}:${mm}</div>
@@ -484,31 +497,19 @@ function renderLogin(root){
         </div>
       </div>
       <div class="card section">
-        <h2>建立新帳號</h2>
-        <div class="grid2">
-          <div>
-            <label class="small muted">姓名</label>
-            <input id="registerName" placeholder="請輸入姓名" value="${escapeHtml(state.registerName)}">
-          </div>
-          <div>
-            <label class="small muted">Email</label>
-            <input id="registerEmail" type="email" placeholder="請輸入 Email" value="${escapeHtml(state.registerEmail)}">
-          </div>
+        <h2>帳號申請說明</h2>
+        <div class="okbox">建立新帳號功能已移除。請由管理員統一建立帳號後，再將登入資訊發給人員使用。</div>
+        <div style="height:12px"></div>
+        <div class="portal-grid">
+          <div class="card portal-box"><h3>帳號建立</h3><div class="muted">由管理員建立員工帳號，避免自行註冊造成權限混亂。</div></div>
+          <div class="card portal-box"><h3>登入方式</h3><div class="muted">收到管理員提供的 Email 與密碼後，從右上方員工入口登入。</div></div>
+          <div class="card portal-box"><h3>忘記密碼</h3><div class="muted">若忘記密碼，可使用忘記密碼功能，或聯絡管理員協助重設。</div></div>
         </div>
-        <div style="height:10px"></div>
-        <label class="small muted">密碼</label>
-        <input id="registerPassword" type="password" placeholder="至少 6 碼" value="${escapeHtml(state.registerPassword)}">
-        ${state.registerError ? `<div style="height:10px"></div><div class="warnbox">${escapeHtml(state.registerError)}</div>` : ""}
-        <div style="height:14px"></div>
-        <button class="btn secondary" onclick="registerFromUI()">註冊帳號</button>
       </div>
     </div>
   </div>`;
   document.getElementById("loginEmail").oninput = e => state.loginEmail = e.target.value;
   document.getElementById("loginPassword").oninput = e => state.loginPassword = e.target.value;
-  document.getElementById("registerName").oninput = e => state.registerName = e.target.value;
-  document.getElementById("registerEmail").oninput = e => state.registerEmail = e.target.value;
-  document.getElementById("registerPassword").oninput = e => state.registerPassword = e.target.value;
 }
 
 function renderDashboard(){
@@ -568,15 +569,21 @@ function renderDashboard(){
 }
 
 function itemCard(item){
+  const isRead = itemReadByCurrentUser(item);
+  const readNames = itemReadNames(item);
   return `
   <div class="item">
     <div class="chips">
       <span class="chip">${escapeHtml(item.category)}</span>
       <span class="chip ${statuses[item.status]?.cls || "neutral"}">${escapeHtml(statuses[item.status]?.label || item.status)}</span>
+      <span class="chip ${isRead ? "ok" : "warn"}">${isRead ? "我已讀" : "我未讀"}</span>
+      <span class="chip neutral">已讀 ${readNames.length} 人</span>
     </div>
     <div style="margin-top:12px;line-height:1.8">${highlightText(item.content,state.searchText)}</div>
     <div class="small muted" style="margin-top:8px">${escapeHtml(item.createdByName||"")}</div>
+    ${readNames.length ? `<div class="small muted" style="margin-top:8px">已讀人員：${escapeHtml(readNames.join("、"))}</div>` : `<div class="small muted" style="margin-top:8px">已讀人員：尚無</div>`}
     <div class="row" style="margin-top:12px">
+      <button class="btn ${isRead ? "secondary" : "primary"}" onclick="toggleReadStatusFromUI('${item.id}', ${isRead ? 'false' : 'true'})">${isRead ? "改回未讀" : "標記已讀"}</button>
       ${canEditStatus() ? `<select onchange="updateStatusFromUI('${item.id}', this.value)">${Object.keys(statuses).map(k=>`<option value="${k}" ${item.status===k?"selected":""}>${statuses[k].label}</option>`).join("")}</select>` : `<div class="chip ${statuses[item.status]?.cls || "neutral"}">${escapeHtml(statuses[item.status]?.label || item.status)}</div>`}
       ${canEditItem() ? `<button class="btn secondary" onclick="startEditItemFromUI('${item.id}', ${JSON.stringify(item.content).replace(/"/g,'&quot;')})">編輯</button>` : ""}
       ${canDeleteItem() ? `<button class="btn danger" onclick="deleteItemFromUI('${item.id}')">刪除</button>` : ""}
@@ -607,9 +614,16 @@ function renderForms(){
     </div>
     <div style="height:12px"></div>
     <div class="row" style="gap:8px;align-items:center">
-      <span class="small muted">快速篩選：</span>
+      <span class="small muted">狀態：</span>
       ${statusQuickLinks.map(s => `<button class="btn ${state.formsStatusFilter===s.key?"primary":"secondary"}" onclick="setFormsStatusFilterFromUI('${s.key}')">${s.label}</button>`).join("")}
-      ${state.formsStatusFilter ? `<button class="btn secondary" onclick="clearFormsStatusFilterFromUI()">清除篩選</button>` : ``}
+      ${state.formsStatusFilter ? `<button class="btn secondary" onclick="clearFormsStatusFilterFromUI()">清除狀態</button>` : ``}
+    </div>
+    <div style="height:10px"></div>
+    <div class="row" style="gap:8px;align-items:center">
+      <span class="small muted">已讀：</span>
+      <button class="btn ${state.formsReadFilter==="all"?"primary":"secondary"}" onclick="setFormsReadFilterFromUI('all')">全部</button>
+      <button class="btn ${state.formsReadFilter==="unread"?"primary":"secondary"}" onclick="setFormsReadFilterFromUI('unread')">未讀</button>
+      <button class="btn ${state.formsReadFilter==="read"?"primary":"secondary"}" onclick="setFormsReadFilterFromUI('read')">已讀</button>
     </div>
     <div style="height:12px"></div>
     ${items.length ? `<div class="list">${items.map(itemCard).join("")}</div>` : `<div class="empty">目前沒有資料</div>`}
@@ -749,6 +763,7 @@ function renderHistory(){
         </div>
         <div style="margin-top:10px">${escapeHtml(i.content)}</div>
         <div class="small muted" style="margin-top:8px">${escapeHtml(i.createdByName||"")}</div>
+        <div class="small muted" style="margin-top:8px">${itemReadByCurrentUser(i) ? "我已讀" : "我未讀"}</div>
       </div>`).join("")}</div>` : `<div class="empty">查無資料</div>`}
   </div>`;
 }
@@ -812,7 +827,7 @@ function renderApp(root){
         ${canManageUsers() ? `<button class="navbtn ${state.tab==="users"?"active":""}" onclick="switchTab('users')">帳號</button>` : ""}
         <div style="height:14px"></div>
         <div class="okbox small">
-          版本 B.4.0.1 已啟用：<br>
+          版本 B.4.2 已啟用：<br>
           ・角色中文顯示<br>
           ・角色儲存修正<br>
           ・帳號頁操作優化<br>
@@ -914,12 +929,14 @@ window.openHistoryStatusFromUI = openHistoryStatus;
 window.addItemFromUI = addItem;
 window.updateStatusFromUI = updateStatus;
 window.deleteItemFromUI = deleteItem;
+window.toggleReadStatusFromUI = toggleReadStatus;
 window.addAnnouncementFromUI = addAnnouncement;
 window.deleteAnnouncementFromUI = deleteAnnouncement;
 window.switchTab = tab => setState({tab});
 window.resetFiltersFromUI = () => setState({searchText:"",formsStatusFilter:"",historyStatusFilter:"",selectedDate:today(),selectedShift:"",selectedStore:canViewAllStores()?"A":(profileStoreId(state.profile)||"A")});
 window.setFormsStatusFilterFromUI = status => setState({formsStatusFilter:status,tab:"forms"});
 window.clearFormsStatusFilterFromUI = () => setState({formsStatusFilter:""});
+window.setFormsReadFilterFromUI = value => setState({formsReadFilter:value});
 window.setHistoryStatusFilterFromUI = status => setState({historyStatusFilter:status,tab:"history"});
 window.clearHistoryStatusFilterFromUI = () => setState({historyStatusFilter:"",tab:"history"});
 window.saveUserRoleFromUI = async uid => {
