@@ -10,7 +10,7 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/icon-192.svg" />
-  <title>交接管理系統｜版本B.2.1</title>
+  <title>交接管理系統｜版本B.2.2</title>
   <style>
     :root{
       --bg:#f4f6fb; --card:#fff; --text:#111827; --muted:#6b7280; --border:#e5e7eb;
@@ -112,7 +112,6 @@ const today = () => {
 let state = {
   authReady:false,currentUser:null,profile:null,
   users:[],handovers:[],announcements:[],stores:storesSeed,
-  storeDrafts:{},
   tab:"dashboard",searchText:"",
   selectedDate:today(),selectedShift:"晚班",selectedStore:"A",
   historyDate:"",historyStore:"A",historyShift:"",
@@ -147,9 +146,6 @@ const currentUserName = () => state.profile?.name || state.currentUser?.email ||
 const profileStoreId = profile => String(profile?.storeId || profile?.store || "").replace("店","");
 const visibleStores = () => canViewAllStores() ? state.stores : state.stores.filter(s => s.id === profileStoreId(state.profile));
 const effectiveStore = () => canViewAllStores() ? state.selectedStore : (profileStoreId(state.profile) || "A");
-const storeNameById = id => (state.stores.find(s => s.id===id)?.name || `${id}店`);
-const canManageStores = () => normalizeRole(state.profile?.role) === "admin";
-const announcementSeenKey = () => `handover_seen_announcement_${state.currentUser?.uid || "guest"}`;
 
 function dashboardRows(){
   return visibleStores().map(store => {
@@ -229,23 +225,10 @@ function subscribeData(){
   unsubscribers.push(onSnapshot(collection(db,"handovers"), snap => setState({handovers:snap.docs.map(d=>({id:d.id,...d.data()}))})));
   unsubscribers.push(onSnapshot(collection(db,"announcements"), snap => {
     const rows = snap.docs.map(d=>({id:d.id,...d.data()}));
-    rows.sort((a,b) => Number(b.createdAt?.seconds||0) - Number(a.createdAt?.seconds||0));
-    const latest = rows[0] || null;
-    const seenId = localStorage.getItem(announcementSeenKey());
-    setState({ announcements:rows, lastAnnouncement:latest, showAnnouncementModal:!!(latest && state.currentUser && latest.id !== seenId) });
+    rows.sort((a,b) => String(b.createdAt?.seconds||0).localeCompare(String(a.createdAt?.seconds||0)));
+    setState({ announcements:rows, lastAnnouncement:rows[0]||null, showAnnouncementModal:!!(rows[0]&&state.currentUser) });
   }));
   unsubscribers.push(onSnapshot(collection(db,"users"), snap => setState({users:snap.docs.map(d=>({id:d.id,...d.data(),role:normalizeRole(d.data().role)}))})));
-  unsubscribers.push(onSnapshot(collection(db,"stores"), async snap => {
-    if(snap.empty){
-      for(const s of storesSeed){
-        await setDoc(doc(db,"stores",s.id), s, {merge:true});
-      }
-      setState({stores:storesSeed, storeDrafts:Object.fromEntries(storesSeed.map(s=>[s.id,s.name]))});
-      return;
-    }
-    const rows = snap.docs.map(d => ({id:d.id,...d.data()})).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
-    setState({stores:rows, storeDrafts:Object.fromEntries(rows.map(s=>[s.id,s.name || `${s.id}店`]))});
-  }));
 }
 
 async function login(){
@@ -315,10 +298,19 @@ async function deleteAnnouncement(id){
   if(!canPostAnnouncements()) return alert("你沒有刪除公告權限");
   await deleteDoc(doc(db,"announcements",id));
 }
-async function saveUserRole(uid,role,storeId){
+async function saveUserRole(uid, role, storeId){
   if(!canManageUsers()) return alert("只有管理員可調整帳號");
   const r = normalizeRole(role);
-  await updateDoc(doc(db,"users",uid),{role:r,storeId:["store_supervisor","staff"].includes(r)?storeId:null});
+  const payload = {
+    role: r,
+    updatedAt: serverTimestamp()
+  };
+  if(["store_supervisor","staff"].includes(r)){
+    payload.storeId = storeId || "A";
+  }else{
+    payload.storeId = null;
+  }
+  await updateDoc(doc(db,"users",uid), payload);
 }
 async function disableUser(uid){
   if(!canManageUsers()) return alert("只有管理員可刪除帳號");
@@ -326,25 +318,15 @@ async function disableUser(uid){
   if(!confirm("確定要刪除這個帳號嗎？刪除後此帳號將無法登入。")) return;
   await updateDoc(doc(db,"users",uid),{active:false,deletedAt:serverTimestamp()});
 }
-async function saveStoreName(id){
-  if(!canManageStores()) return alert("只有管理員可修改店別名稱");
-  const name = String(state.storeDrafts?.[id] || "").trim();
-  if(!name) return alert("請輸入店別名稱");
-  await setDoc(doc(db,"stores",id),{id,name},{merge:true});
-  alert("店別名稱已更新");
-}
-function updateStoreDraft(id,value){
-  setState({storeDrafts:{...state.storeDrafts,[id]:value}});
-}
 const openStore = id => setState({selectedStore:id,tab:"forms"});
 
 function renderLogin(root){
   root.innerHTML = `
   <div class="login-wrap">
     <div class="card hero">
-      <div class="badge">版本 B.2.1</div>
+      <div class="badge">版本 B</div>
       <div class="title" style="margin-top:12px">交接管理系統</div>
-      <p class="muted" style="font-size:18px;line-height:1.8">版本 B.2.1 已加入：管理員顯示修正、公告可刪除、交接可編輯、歷史查詢、密碼重設、手機版優化、店別名稱管理、公告不重複彈出。</p>
+      <p class="muted" style="font-size:18px;line-height:1.8">版本 B 已加入：管理員顯示修正、公告可刪除、交接可編輯、歷史查詢、密碼重設、手機版優化。</p>
       <div class="grid4" style="margin-top:18px">
         <div class="card stat"><div class="sub">角色權限</div><div class="num">完整</div><div class="sub">顯示修正完成</div></div>
         <div class="card stat"><div class="sub">公告</div><div class="num">可刪</div><div class="sub">管理員 / 總經理</div></div>
@@ -504,7 +486,7 @@ function renderAnnouncements(){
                 <div class="small muted">${escapeHtml(a.createdByName||"")}</div>
               </div>
               <div class="row">
-                <div class="chip">${a.targetStoreId ? escapeHtml(storeNameById(a.targetStoreId)) : "全店"}</div>
+                <div class="chip">${a.targetStoreId ? escapeHtml(a.targetStoreId+"店") : "全店"}</div>
                 ${canPostAnnouncements() ? `<button class="btn danger" onclick="deleteAnnouncementFromUI('${a.id}')">刪除</button>` : ""}
               </div>
             </div>
@@ -519,22 +501,8 @@ function renderUsers(){
   return `
   <div class="card section">
     <h2>帳號管理</h2>
-    <div class="okbox">管理員可調整角色與店別，也可修改店別名稱。員工 staff 只能新增/查看，店主管可改狀態，總經理可看全部店。</div>
+    <div class="okbox">管理員可調整角色與店別。員工 staff 只能新增/查看，店主管可改狀態，總經理可看全部店。</div>
   </div>
-  ${canManageStores() ? `
-  <div class="card section">
-    <h2>店別名稱管理</h2>
-    <div class="list">
-      ${state.stores.map(s => `
-        <div class="item">
-          <div class="row" style="justify-content:space-between;align-items:center;gap:12px">
-            <div style="min-width:90px;font-weight:800">${escapeHtml(s.id)}</div>
-            <input value="${escapeHtml(state.storeDrafts?.[s.id] ?? s.name)}" oninput="updateStoreDraftFromUI('${s.id}', this.value)">
-            <button class="btn primary" onclick="saveStoreNameFromUI('${s.id}')">儲存名稱</button>
-          </div>
-        </div>`).join("")}
-    </div>
-  </div>` : ""}
   <div class="card section">
     <table class="table">
       <thead><tr><th>帳號</th><th>姓名 / Email</th><th>狀態</th><th>角色</th><th>店別</th><th>動作</th></tr></thead>
@@ -553,7 +521,7 @@ function renderUsers(){
               </select>
             </td>
             <td><select id="store_${u.id}" ${u.active===false?'disabled':''}><option value="">-</option>${storeOptionsHtml(u.storeId||"")}</select></td>
-            <td><div class="row"><button class="btn secondary" onclick="saveUserRoleFromUI('${u.id}')" ${u.active===false?"disabled":""}>儲存</button><button class="btn danger" onclick="disableUserFromUI('${u.id}')" ${(state.currentUser && u.id===state.currentUser.uid)?"disabled":""}>刪除</button></div></td>
+            <td><div class="row"><button class="btn secondary" onclick="saveUserRoleFromUI('${u.id}')" ${'${u.active===false?"disabled":""}'}>儲存</button><button class="btn danger" onclick="disableUserFromUI('${u.id}')" ${'${state.currentUser && u.id===state.currentUser.uid?"disabled":""}'}>刪除</button></div></td>
           </tr>`).join("")}
       </tbody>
     </table>
@@ -576,7 +544,7 @@ function renderHistory(){
         <div class="chips">
           <span class="chip">${escapeHtml(i.date)}</span>
           <span class="chip">${escapeHtml(i.shift)}</span>
-          <span class="chip">${escapeHtml(storeNameById(i.storeId))}</span>
+          <span class="chip">${escapeHtml(i.storeId)}店</span>
           <span class="chip ${statuses[i.status]?.cls||"neutral"}">${escapeHtml(statuses[i.status]?.label||i.status)}</span>
         </div>
         <div style="margin-top:10px">${escapeHtml(i.content)}</div>
@@ -644,14 +612,12 @@ function renderApp(root){
         ${canManageUsers() ? `<button class="navbtn ${state.tab==="users"?"active":""}" onclick="switchTab('users')">帳號</button>` : ""}
         <div style="height:14px"></div>
         <div class="okbox small">
-          版本 B.2.1 已啟用：<br>
+          版本 B.2.2 已啟用：<br>
           ・管理員顯示修正<br>
           ・公告可刪除<br>
           ・交接可編輯<br>
           ・歷史查詢<br>
-          ・密碼重設<br>
-          ・店別名稱管理<br>
-          ・公告不重複彈出
+          ・密碼重設
         </div>
       </div>
       <div class="content">${main}</div>
@@ -704,20 +670,18 @@ window.deleteItemFromUI = deleteItem;
 window.addAnnouncementFromUI = addAnnouncement;
 window.deleteAnnouncementFromUI = deleteAnnouncement;
 window.switchTab = tab => setState({tab});
-window.resetFiltersFromUI = () => setState({searchText:"",selectedDate:today(),selectedShift:"晚班",selectedStore:profileStoreId(state.profile)||"A"});
+window.resetFiltersFromUI = () => setState({searchText:"",selectedDate:today(),selectedShift:"晚班",selectedStore:"A"});
 window.saveUserRoleFromUI = async uid => {
   const role = document.getElementById(`role_${uid}`).value;
   const storeId = document.getElementById(`store_${uid}`).value || null;
   await saveUserRole(uid, role, storeId);
   alert("已儲存");
 };
-window.closeAnnouncementModal = () => { if(state.lastAnnouncement?.id){ localStorage.setItem(announcementSeenKey(), state.lastAnnouncement.id); } setState({showAnnouncementModal:false}); };
+window.closeAnnouncementModal = () => setState({showAnnouncementModal:false});
 window.startEditItemFromUI = (id,content) => setState({editingItemId:id,editingItemContent:content});
 window.cancelEditItem = () => setState({editingItemId:null,editingItemContent:""});
 window.saveEditItemFromUI = saveEditItem;
 window.disableUserFromUI = disableUser;
-window.saveStoreNameFromUI = saveStoreName;
-window.updateStoreDraftFromUI = updateStoreDraft;
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
