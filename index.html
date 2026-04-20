@@ -6,7 +6,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>交接管理系統｜版本B.4.2</title>
+  <title>交接管理系統｜版本B.4.3</title>
   <style>
     :root{
       --bg:#f4f6fb; --card:#fff; --text:#111827; --muted:#6b7280; --border:#e5e7eb;
@@ -62,6 +62,7 @@
     .loading{padding:40px;text-align:center;color:var(--muted)}
     .modalbg{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:16px}
     .modal{max-width:560px;width:100%;background:#fff;border-radius:20px;border:1px solid var(--border);padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+    .unread-badge{position:absolute;top:10px;right:10px;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:#dc2626;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1}
     .landing{max-width:1280px;margin:0 auto;padding:24px;display:grid;gap:20px}
     .weather-shell{display:grid;grid-template-columns:1.25fr .75fr;gap:20px;align-items:stretch}
     .weather-hero{padding:28px;background:linear-gradient(135deg,#0f172a 0%,#1d4ed8 55%,#60a5fa 100%);color:#fff;overflow:hidden;position:relative}
@@ -176,12 +177,20 @@ function dashboardRows(){
   return visibleStores().map(store => {
     const list = state.handovers.filter(h => h.date===state.selectedDate && h.storeId===store.id);
     const total = list.length;
-    const done = list.filter(i => i.status==="done").length;
-    const inProgress = list.filter(i => i.status==="in_progress").length;
-    const pending = list.filter(i => i.status==="pending").length;
-    const followup = list.filter(i => i.status==="pending_followup").length;
+    const doneItems = list.filter(i => i.status==="done");
+    const inProgressItems = list.filter(i => i.status==="in_progress");
+    const pendingItems = list.filter(i => i.status==="pending");
+    const followupItems = list.filter(i => i.status==="pending_followup");
+    const done = doneItems.length;
+    const inProgress = inProgressItems.length;
+    const pending = pendingItems.length;
+    const followup = followupItems.length;
     const abnormal = pending + followup;
-    return {...store,total,done,inProgress,pending,followup,abnormal,progress: total?Math.round(done/total*100):0};
+    const doneUnread = doneItems.filter(i => !itemReadByCurrentUser(i)).length;
+    const inProgressUnread = inProgressItems.filter(i => !itemReadByCurrentUser(i)).length;
+    const pendingUnread = pendingItems.filter(i => !itemReadByCurrentUser(i)).length;
+    const followupUnread = followupItems.filter(i => !itemReadByCurrentUser(i)).length;
+    return {...store,total,done,inProgress,pending,followup,abnormal,doneUnread,inProgressUnread,pendingUnread,followupUnread,progress: total?Math.round(done/total*100):0};
   });
 }
 function totals(){
@@ -547,10 +556,10 @@ function renderDashboard(){
             <div class="progress"><div class="bar" style="width:${row.progress}%"></div></div>
             <div class="small muted" style="margin-top:8px">完成 ${row.progress}%</div>
             <div class="grid2" style="margin-top:12px">
-              <button class="card stat" style="padding:12px;text-align:left;cursor:pointer" onclick="event.stopPropagation();openHistoryStatusFromUI('${row.id}','done')"><div class="sub">已處理</div><div class="num" style="font-size:22px">${row.done}</div></button>
-              <button class="card stat" style="padding:12px;text-align:left;cursor:pointer" onclick="event.stopPropagation();openHistoryStatusFromUI('${row.id}','in_progress')"><div class="sub">處理中</div><div class="num" style="font-size:22px">${row.inProgress}</div></button>
-              <button class="card stat" style="padding:12px;text-align:left;cursor:pointer" onclick="event.stopPropagation();openHistoryStatusFromUI('${row.id}','pending')"><div class="sub">待處理</div><div class="num" style="font-size:22px">${row.pending}</div></button>
-              <button class="card stat" style="padding:12px;text-align:left;cursor:pointer" onclick="event.stopPropagation();openHistoryStatusFromUI('${row.id}','pending_followup')"><div class="sub">待追蹤</div><div class="num" style="font-size:22px">${row.followup}</div></button>
+              <button class="card stat" style="padding:12px;text-align:left;cursor:pointer;position:relative" onclick="event.stopPropagation();openHistoryStatusFromUI('${row.id}','done')"><div class="sub">已處理</div>${row.doneUnread>0 ? `<div class="unread-badge">${row.doneUnread}</div>` : ""}<div class="num" style="font-size:22px">${row.done}</div></button>
+              <button class="card stat" style="padding:12px;text-align:left;cursor:pointer;position:relative" onclick="event.stopPropagation();openHistoryStatusFromUI('${row.id}','in_progress')"><div class="sub">處理中</div>${row.inProgressUnread>0 ? `<div class="unread-badge">${row.inProgressUnread}</div>` : ""}<div class="num" style="font-size:22px">${row.inProgress}</div></button>
+              <button class="card stat" style="padding:12px;text-align:left;cursor:pointer;position:relative" onclick="event.stopPropagation();openHistoryStatusFromUI('${row.id}','pending')"><div class="sub">待處理</div>${row.pendingUnread>0 ? `<div class="unread-badge">${row.pendingUnread}</div>` : ""}<div class="num" style="font-size:22px">${row.pending}</div></button>
+              <button class="card stat" style="padding:12px;text-align:left;cursor:pointer;position:relative" onclick="event.stopPropagation();openHistoryStatusFromUI('${row.id}','pending_followup')"><div class="sub">待追蹤</div>${row.followupUnread>0 ? `<div class="unread-badge">${row.followupUnread}</div>` : ""}<div class="num" style="font-size:22px">${row.followup}</div></button>
             </div>
           </div>`).join("")}
       </div>
@@ -827,7 +836,7 @@ function renderApp(root){
         ${canManageUsers() ? `<button class="navbtn ${state.tab==="users"?"active":""}" onclick="switchTab('users')">帳號</button>` : ""}
         <div style="height:14px"></div>
         <div class="okbox small">
-          版本 B.4.2 已啟用：<br>
+          版本 B.4.3 已啟用：<br>
           ・角色中文顯示<br>
           ・角色儲存修正<br>
           ・帳號頁操作優化<br>
