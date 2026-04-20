@@ -592,7 +592,7 @@ function itemCard(item){
     <div class="small muted" style="margin-top:8px">${escapeHtml(item.createdByName||"")}</div>
     ${readNames.length ? `<div class="small muted" style="margin-top:8px">已讀人員：${escapeHtml(readNames.join("、"))}</div>` : `<div class="small muted" style="margin-top:8px">已讀人員：尚無</div>`}
     <div class="row" style="margin-top:12px">
-      <button class="btn ${isRead ? "secondary" : "primary"}" onclick="toggleReadStatusFromUI('${item.id}', ${isRead ? 'false' : 'true'})">${isRead ? "改回未讀" : "標記已讀"}</button>
+      ${!isRead ? `<button class="btn primary" onclick="toggleReadStatusFromUI('${item.id}', true)">標記已讀</button>` : `<span class="chip ok">已讀</span>`}
       ${canEditStatus() ? `<select onchange="updateStatusFromUI('${item.id}', this.value)">${Object.keys(statuses).map(k=>`<option value="${k}" ${item.status===k?"selected":""}>${statuses[k].label}</option>`).join("")}</select>` : `<div class="chip ${statuses[item.status]?.cls || "neutral"}">${escapeHtml(statuses[item.status]?.label || item.status)}</div>`}
       ${canEditItem() ? `<button class="btn secondary" onclick="startEditItemFromUI('${item.id}', ${JSON.stringify(item.content).replace(/"/g,'&quot;')})">編輯</button>` : ""}
       ${canDeleteItem() ? `<button class="btn danger" onclick="deleteItemFromUI('${item.id}')">刪除</button>` : ""}
